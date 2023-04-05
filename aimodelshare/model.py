@@ -4,7 +4,7 @@ import json
 import onnx
 import numpy as np
 import pandas as pd
-import requests 
+import requests
 import json
 import ast
 import tensorflow as tf
@@ -12,7 +12,7 @@ import tempfile as tmp
 from datetime import datetime
 try:
     import torch
-except:
+except BaseException:
     pass
 
 from aimodelshare.leaderboard import get_leaderboard
@@ -23,10 +23,10 @@ from aimodelshare.utils import ignore_warning
 import warnings
 
 
-def _get_file_list(client, bucket,keysubfolderid):
+def _get_file_list(client, bucket, keysubfolderid):
     #  Reading file list {{{
     try:
-        objectlist=[]
+        objectlist = []
         paginator = client.get_paginator('list_objects')
         pages = paginator.paginate(Bucket=bucket, Prefix=keysubfolderid)
 
@@ -39,30 +39,33 @@ def _get_file_list(client, bucket,keysubfolderid):
 
     file_list = []
     for key in objectlist:
-            file_list.append(key.split("/")[-1])
+        file_list.append(key.split("/")[-1])
     #  }}}
 
     return file_list, None
 
 
 def _delete_s3_object(client, bucket, model_id, filename):
-    deletionobject = client["resource"].Object(bucket, model_id + "/" + filename)
+    deletionobject = client["resource"].Object(
+        bucket, model_id + "/" + filename)
     deletionobject.delete()
 
-def _get_predictionmodel_key(unique_model_id,file_extension):
-    if file_extension==".pkl":
+
+def _get_predictionmodel_key(unique_model_id, file_extension):
+    if file_extension == ".pkl":
         file_key = unique_model_id + "/runtime_model" + file_extension
         versionfile_key = unique_model_id + "/predictionmodel_1" + file_extension
     else:
         file_key = unique_model_id + "/runtime_model" + file_extension
         versionfile_key = unique_model_id + "/predictionmodel_1" + file_extension
-    return file_key,versionfile_key
+    return file_key, versionfile_key
 
 
 def _upload_onnx_model(modelpath, client, bucket, model_id, model_version):
     # Check the model {{{
     if not os.path.exists(modelpath):
-        raise FileNotFoundError(f"The model file at {modelpath} does not exist")
+        raise FileNotFoundError(
+            f"The model file at {modelpath} does not exist")
 
     file_name = os.path.basename(modelpath)
     file_name, file_ext = os.path.splitext(file_name)
@@ -85,11 +88,13 @@ def _upload_onnx_model(modelpath, client, bucket, model_id, model_version):
     except Exception as err:
         return err
     # }}}
+
 
 def _upload_native_model(modelpath, client, bucket, model_id, model_version):
     # Check the model {{{
     if not os.path.exists(modelpath):
-        raise FileNotFoundError(f"The model file at {modelpath} does not exist")
+        raise FileNotFoundError(
+            f"The model file at {modelpath} does not exist")
 
     file_name = os.path.basename(modelpath)
     file_name, file_ext = os.path.splitext(file_name)
@@ -114,46 +119,61 @@ def _upload_native_model(modelpath, client, bucket, model_id, model_version):
     # }}}
 
 
-def _upload_preprocessor(preprocessor, client, bucket, model_id, model_version):
+def _upload_preprocessor(
+        preprocessor,
+        client,
+        bucket,
+        model_id,
+        model_version):
 
-  try:
+    try:
 
-    
-    # Check the preprocessor {{{
-    if not os.path.exists(preprocessor):
-        raise FileNotFoundError(
-            f"The preprocessor file at {preprocessor} does not exist"
-        )
+        # Check the preprocessor {{{
+        if not os.path.exists(preprocessor):
+            raise FileNotFoundError(
+                f"The preprocessor file at {preprocessor} does not exist"
+            )
 
-    
-    file_name = os.path.basename(preprocessor)
-    file_name, file_ext = os.path.splitext(file_name)
-    
-    from zipfile import ZipFile
-    dir_zip = preprocessor
+        file_name = os.path.basename(preprocessor)
+        file_name, file_ext = os.path.splitext(file_name)
 
-    #zipObj = ZipFile(os.path.join("./preprocessor.zip"), 'a')
-    #/Users/aishwarya/Downloads/aimodelshare-master
-    client["client"].upload_file(dir_zip, bucket, model_id + "/preprocessor_v" + str(model_version)+ ".zip")
-  except Exception as e:
-    print(e)
+        from zipfile import ZipFile
+        dir_zip = preprocessor
+
+        #zipObj = ZipFile(os.path.join("./preprocessor.zip"), 'a')
+        # /Users/aishwarya/Downloads/aimodelshare-master
+        client["client"].upload_file(
+            dir_zip,
+            bucket,
+            model_id +
+            "/preprocessor_v" +
+            str(model_version) +
+            ".zip")
+    except Exception as e:
+        print(e)
 
 
 def _update_leaderboard(
-    modelpath, eval_metrics, client, bucket, model_id, model_version, onnx_model=None
-):
+        modelpath,
+        eval_metrics,
+        client,
+        bucket,
+        model_id,
+        model_version,
+        onnx_model=None):
     # Loading the model and its metadata {{{
-    if onnx_model==None:
+    if onnx_model is None:
         metadata = _get_leaderboard_data(onnx_model, eval_metrics)
 
     elif modelpath is not None:
         if not os.path.exists(modelpath):
-            raise FileNotFoundError(f"The model file at {modelpath} does not exist")
+            raise FileNotFoundError(
+                f"The model file at {modelpath} does not exist")
 
         model = onnx.load(modelpath)
         metadata = _get_leaderboard_data(model, eval_metrics)
 
-    else: 
+    else:
         metadata = eval_metrics
         # get general model info
         metadata['ml_framework'] = 'unknown'
@@ -162,10 +182,9 @@ def _update_leaderboard(
         metadata['model_type'] = 'unknown'
         metadata['model_config'] = None
 
-    if custom_metadata is not None: 
+    if custom_metadata is not None:
 
         metadata = dict(metadata, **custom_metadata)
-
 
     # }}}
 
@@ -174,9 +193,9 @@ def _update_leaderboard(
     metadata["timestamp"] = str(datetime.now())
     metadata["version"] = model_version
     # }}}
-    
-    #TODO: send above data in post call to /eval and update master table on back end rather than downloading locally.
-    #Either way something is breaking and the s3 version should still work right??
+
+    # TODO: send above data in post call to /eval and update master table on back end rather than downloading locally.
+    # Either way something is breaking and the s3 version should still work right??
     # Read existing table {{{
     try:
         leaderboard = client["client"].get_object(
@@ -205,7 +224,7 @@ def _update_leaderboard(
 
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        leaderboard['username']=leaderboard.pop("username")
+        leaderboard['username'] = leaderboard.pop("username")
         leaderboard['timestamp'] = leaderboard.pop("timestamp")
         leaderboard['version'] = leaderboard.pop("version")
 
@@ -222,37 +241,38 @@ def _update_leaderboard(
         return err
     # }}}
 
+
 def _update_leaderboard_public(
-    modelpath, eval_metrics, s3_presigned_dict, custom_metadata=None, 
-    private=False, leaderboard_type = "competition", onnx_model=None):
+        modelpath, eval_metrics, s3_presigned_dict, custom_metadata=None,
+        private=False, leaderboard_type="competition", onnx_model=None):
 
-    if private==True:
+    if private:
         mastertable_path = 'model_eval_data_mastertable_private.csv'
-    else: 
+    else:
         mastertable_path = 'model_eval_data_mastertable.csv'
-
 
     # Loading the model and its metadata {{{
 
     if modelpath is not None:
         if not os.path.exists(modelpath):
-            raise FileNotFoundError(f"The model file at {modelpath} does not exist")
+            raise FileNotFoundError(
+                f"The model file at {modelpath} does not exist")
 
-    model_versions = [os.path.splitext(f)[0].split("_")[-1][1:] for f in s3_presigned_dict['put'].keys()]
-    
+    model_versions = [os.path.splitext(f)[0].split(
+        "_")[-1][1:] for f in s3_presigned_dict['put'].keys()]
+
     model_versions = filter(lambda v: v.isnumeric(), model_versions)
     model_versions = list(map(int, model_versions))
-    model_version=model_versions[0]
-    
+    model_version = model_versions[0]
 
-    if modelpath == None and onnx_model:
+    if modelpath is None and onnx_model:
         metadata = _get_leaderboard_data(onnx_model, eval_metrics)
 
     elif modelpath is not None:
         onnx_model = onnx.load(modelpath)
         metadata = _get_leaderboard_data(onnx_model, eval_metrics)
 
-    else: 
+    else:
 
         metadata = eval_metrics
 
@@ -263,8 +283,7 @@ def _update_leaderboard_public(
         metadata['model_type'] = 'unknown'
         metadata['model_config'] = None
 
-
-    if custom_metadata is not None: 
+    if custom_metadata is not None:
 
         metadata = dict(metadata, **custom_metadata)
 
@@ -276,21 +295,23 @@ def _update_leaderboard_public(
     metadata["version"] = model_version
 
     # }}}
-    temp=tmp.mkdtemp()
-    #TODO: send above data in post call to /eval and update master table on back end rather than downloading locally.
-    #Either way something is breaking and the s3 version should still work right??
+    temp = tmp.mkdtemp()
+    # TODO: send above data in post call to /eval and update master table on back end rather than downloading locally.
+    # Either way something is breaking and the s3 version should still work right??
     # Read existing table {{{
     try:
         import wget
 
-        #Get leaderboard
-        leaderboardfilename = wget.download(s3_presigned_dict['get'][mastertable_path], out=temp+"/"+mastertable_path)
+        # Get leaderboard
+        leaderboardfilename = wget.download(
+            s3_presigned_dict['get'][mastertable_path],
+            out=temp + "/" + mastertable_path)
         import pandas as pd
-        leaderboard=pd.read_csv(temp+"/"+mastertable_path, sep="\t")
+        leaderboard = pd.read_csv(temp + "/" + mastertable_path, sep="\t")
 
         columns = leaderboard.columns
-        
-    except:
+
+    except BaseException:
         # Create leaderboard if not exists
         # FIXME: Find a better way to get columns
         import pandas as pd
@@ -307,96 +328,108 @@ def _update_leaderboard_public(
 
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        leaderboard['username']=leaderboard.pop("username")
+        leaderboard['username'] = leaderboard.pop("username")
         leaderboard['timestamp'] = leaderboard.pop("timestamp")
         leaderboard['version'] = leaderboard.pop("version")
-        
-    leaderboard_csv = leaderboard.to_csv(temp+"/"+mastertable_path,index=False, sep="\t")
-    metadata.pop("model_config", "pop worked")
 
+    leaderboard_csv = leaderboard.to_csv(
+        temp + "/" + mastertable_path, index=False, sep="\t")
+    metadata.pop("model_config", "pop worked")
 
     try:
 
-      putfilekeys=list(s3_presigned_dict['put'].keys())
-      modelputfiles = [s for s in putfilekeys if str("csv") in s]
+        putfilekeys = list(s3_presigned_dict['put'].keys())
+        modelputfiles = [s for s in putfilekeys if str("csv") in s]
 
-      fileputlistofdicts=[]
-      for i in modelputfiles:
-        filedownload_dict=ast.literal_eval(s3_presigned_dict['put'][i])
-        fileputlistofdicts.append(filedownload_dict)
+        fileputlistofdicts = []
+        for i in modelputfiles:
+            filedownload_dict = ast.literal_eval(s3_presigned_dict['put'][i])
+            fileputlistofdicts.append(filedownload_dict)
 
+        with open(temp + "/" + mastertable_path, 'rb') as f:
+            files = {'file': (temp + "/" + mastertable_path, f)}
 
-      with open(temp+"/"+mastertable_path, 'rb') as f:
-        files = {'file': (temp+"/"+mastertable_path, f)}
+            if private:
 
-        if private:
+                http_response = requests.post(
+                    fileputlistofdicts[1]['url'],
+                    data=fileputlistofdicts[1]['fields'],
+                    files=files)
 
-            http_response = requests.post(fileputlistofdicts[1]['url'], data=fileputlistofdicts[1]['fields'], files=files)
+            else:
 
-        else:
+                http_response = requests.post(
+                    fileputlistofdicts[0]['url'],
+                    data=fileputlistofdicts[0]['fields'],
+                    files=files)
 
-            http_response = requests.post(fileputlistofdicts[0]['url'], data=fileputlistofdicts[0]['fields'], files=files)
-
-        return metadata
+            return metadata
 
     except Exception as err:
 
         return err
 
- 
 
-def upload_model_dict(modelpath, s3_presigned_dict, bucket, model_id, model_version, placeholder=False, onnx_model=None):
+def upload_model_dict(
+        modelpath,
+        s3_presigned_dict,
+        bucket,
+        model_id,
+        model_version,
+        placeholder=False,
+        onnx_model=None):
     import wget
     import json
     import ast
-    temp=tmp.mkdtemp()
+    temp = tmp.mkdtemp()
     # get model summary from onnx
     import astunparse
 
-    if placeholder==False: 
+    if not placeholder:
 
-        if onnx_model==None:
+        if onnx_model is None:
             onnx_model = onnx.load(modelpath)
         meta_dict = _get_metadata(onnx_model)
 
         if meta_dict['ml_framework'] in ['keras', 'pytorch']:
 
             inspect_pd = _model_summary(meta_dict)
-            
+
         elif meta_dict['ml_framework'] in ['sklearn', 'xgboost']:
 
             model_config = meta_dict["model_config"]
             tree = ast.parse(model_config)
 
-            stringconfig=model_config
+            stringconfig = model_config
 
-            problemnodes=[]
+            problemnodes = []
             for node in ast.walk(tree):
                 if isinstance(node, ast.Call):
-                    problemnodes.append(astunparse.unparse(node).replace("\n",""))
+                    problemnodes.append(
+                        astunparse.unparse(node).replace(
+                            "\n", ""))
 
-            problemnodesunique=set(problemnodes)
+            problemnodesunique = set(problemnodes)
             for i in problemnodesunique:
-                stringconfig=stringconfig.replace(i,"'"+i+"'")
+                stringconfig = stringconfig.replace(i, "'" + i + "'")
 
             try:
-                model_config=ast.literal_eval(stringconfig)
+                model_config = ast.literal_eval(stringconfig)
                 model_class = model_from_string(meta_dict['model_type'])
                 default = model_class()
                 default_config = default.get_params().values()
-                model_configkeys=model_config.keys()
-                model_configvalues=model_config.values()
-            except:
+                model_configkeys = model_config.keys()
+                model_configvalues = model_config.values()
+            except BaseException:
                 model_class = str(model_from_string(meta_dict['model_type']))
-                if model_class.find("Voting")>0:
-                      default_config = ["No data available"]
-                      model_configkeys=["No data available"]
-                      model_configvalues=["No data available"]
-
+                if model_class.find("Voting") > 0:
+                    default_config = ["No data available"]
+                    model_configkeys = ["No data available"]
+                    model_configvalues = ["No data available"]
 
             inspect_pd = pd.DataFrame({'param_name': model_configkeys,
-                                        'default_value': default_config,
-                                        'param_value': model_configvalues})
+                                       'default_value': default_config,
+                                       'param_value': model_configvalues})
 
         elif meta_dict['ml_framework'] in ['pyspark']:
             import ast
@@ -405,44 +438,50 @@ def upload_model_dict(modelpath, s3_presigned_dict, bucket, model_id, model_vers
             model_config = meta_dict["model_config"]
             tree = ast.parse(model_config)
 
-            stringconfig=model_config
+            stringconfig = model_config
 
-            problemnodes=[]
+            problemnodes = []
             for node in ast.walk(tree):
                 if isinstance(node, ast.Call):
-                    problemnodes.append(astunparse.unparse(node).replace("\n",""))
+                    problemnodes.append(
+                        astunparse.unparse(node).replace(
+                            "\n", ""))
 
-            problemnodesunique=set(problemnodes)
+            problemnodesunique = set(problemnodes)
             for i in problemnodesunique:
-                stringconfig=stringconfig.replace(i,"'"+i+"'")
+                stringconfig = stringconfig.replace(i, "'" + i + "'")
 
             try:
                 model_config_temp = ast.literal_eval(stringconfig)
-                model_class = pyspark_model_from_string(meta_dict['model_type'])
+                model_class = pyspark_model_from_string(
+                    meta_dict['model_type'])
                 default = model_class()
 
                 # get model config dict from pyspark model object
                 default_config_temp = {}
                 for key, value in default.extractParamMap().items():
                     default_config_temp[key.name] = value
-                
-                # Sort the keys so default and model config key matches each other
+
+                # Sort the keys so default and model config key matches each
+                # other
                 model_config = dict(sorted(model_config_temp.items()))
                 default_config = dict(sorted(default_config_temp.items()))
-                
+
                 model_configkeys = model_config.keys()
                 model_configvalues = model_config.values()
                 default_config = default_config.values()
-            except:
-                model_class = str(pyspark_model_from_string(meta_dict['model_type']))
-                if model_class.find("Voting")>0:
-                      default_config = ["No data available"]
-                      model_configkeys=["No data available"]
-                      model_configvalues=["No data available"]
+            except BaseException:
+                model_class = str(
+                    pyspark_model_from_string(
+                        meta_dict['model_type']))
+                if model_class.find("Voting") > 0:
+                    default_config = ["No data available"]
+                    model_configkeys = ["No data available"]
+                    model_configvalues = ["No data available"]
 
             inspect_pd = pd.DataFrame({'param_name': model_configkeys,
-                                        'default_value': default_config,
-                                        'param_value': model_configvalues})
+                                       'default_value': default_config,
+                                       'param_value': model_configvalues})
 
     else:
         meta_dict = {}
@@ -451,49 +490,70 @@ def upload_model_dict(modelpath, s3_presigned_dict, bucket, model_id, model_vers
 
         #inspect_pd = pd.DataFrame({' ':["No metadata available for this model"]})
         inspect_pd = pd.DataFrame()
-   
+
     try:
-        #Get inspect json
-        inspectdatafilename = wget.download(s3_presigned_dict['get']['inspect_pd_'+str(model_version)+'.json'], out=temp+"/"+'inspect_pd_'+str(model_version)+'.json')
-        
-        with open(temp+"/"+'inspect_pd_'+str(model_version)+'.json') as f:
-            model_dict  = json.load(f)
-    except: 
+        # Get inspect json
+        inspectdatafilename = wget.download(s3_presigned_dict['get']['inspect_pd_' + str(
+            model_version) + '.json'], out=temp + "/" + 'inspect_pd_' + str(model_version) + '.json')
+
+        with open(temp + "/" + 'inspect_pd_' + str(model_version) + '.json') as f:
+            model_dict = json.load(f)
+    except BaseException:
         model_dict = {}
 
     model_dict[str(model_version)] = {'ml_framework': meta_dict['ml_framework'],
                                       'model_type': meta_dict['model_type'],
                                       'model_dict': inspect_pd.to_dict()}
 
-    with open(temp+"/"+'inspect_pd_'+str(model_version)+'.json', 'w') as outfile:
+    with open(temp + "/" + 'inspect_pd_' + str(model_version) + '.json', 'w') as outfile:
         json.dump(model_dict, outfile)
 
     try:
 
-      putfilekeys=list(s3_presigned_dict['put'].keys())
-      modelputfiles = [s for s in putfilekeys if str('inspect_pd_'+str(model_version)+'.json') in s]
+        putfilekeys = list(s3_presigned_dict['put'].keys())
+        modelputfiles = [
+            s for s in putfilekeys if str(
+                'inspect_pd_' +
+                str(model_version) +
+                '.json') in s]
 
-      fileputlistofdicts=[]
-      for i in modelputfiles:
-        filedownload_dict=ast.literal_eval(s3_presigned_dict ['put'][i])
-        fileputlistofdicts.append(filedownload_dict)
+        fileputlistofdicts = []
+        for i in modelputfiles:
+            filedownload_dict = ast.literal_eval(s3_presigned_dict['put'][i])
+            fileputlistofdicts.append(filedownload_dict)
 
-      with open(temp+"/"+'inspect_pd_'+str(model_version)+'.json', 'rb') as f:
-        files = {'file': (temp+"/"+'inspect_pd_'+str(model_version)+'.json', f)}
-        http_response = requests.post(fileputlistofdicts[0]['url'], data=fileputlistofdicts[0]['fields'], files=files)
-    except:
-      pass
+        with open(temp + "/" + 'inspect_pd_' + str(model_version) + '.json', 'rb') as f:
+            files = {
+                'file': (
+                    temp +
+                    "/" +
+                    'inspect_pd_' +
+                    str(model_version) +
+                    '.json',
+                    f)}
+            http_response = requests.post(
+                fileputlistofdicts[0]['url'],
+                data=fileputlistofdicts[0]['fields'],
+                files=files)
+    except BaseException:
+        pass
     return 1
 
 
-def upload_model_graph(modelpath, s3_presigned_dict, bucket, model_id, model_version, onnx_model=None):
+def upload_model_graph(
+        modelpath,
+        s3_presigned_dict,
+        bucket,
+        model_id,
+        model_version,
+        onnx_model=None):
     import wget
     import json
     import ast
-    temp=tmp.mkdtemp()
+    temp = tmp.mkdtemp()
     # get model summary from onnx
 
-    if onnx_model==None:
+    if onnx_model is None:
         onnx_model = onnx.load(modelpath)
 
     meta_dict = _get_metadata(onnx_model)
@@ -510,40 +570,55 @@ def upload_model_graph(modelpath, s3_presigned_dict, bucket, model_id, model_ver
 
         model_graph = ''
 
-    key = model_id+'/model_graph_'+str(model_version)+'.json'
-    
+    key = model_id + '/model_graph_' + str(model_version) + '.json'
+
     try:
-        #Get inspect json
-        modelgraphdatafilename = wget.download(s3_presigned_dict['get']['model_graph_'+str(model_version)+'.json'], out=temp+"/"+'model_graph_'+str(model_version)+'.json')
+        # Get inspect json
+        modelgraphdatafilename = wget.download(s3_presigned_dict['get']['model_graph_' + str(
+            model_version) + '.json'], out=temp + "/" + 'model_graph_' + str(model_version) + '.json')
 
-        with open(temp+"/"+'model_graph_'+str(model_version)+'.json') as f:
-            graph_dict  = json.load(f)
+        with open(temp + "/" + 'model_graph_' + str(model_version) + '.json') as f:
+            graph_dict = json.load(f)
 
-    except: 
+    except BaseException:
         graph_dict = {}
 
     graph_dict[str(model_version)] = {'ml_framework': meta_dict['ml_framework'],
                                       'model_type': meta_dict['model_type'],
                                       'model_graph': model_graph}
 
-    with open(temp+"/"+'model_graph_'+str(model_version)+'.json', 'w') as outfile:
+    with open(temp + "/" + 'model_graph_' + str(model_version) + '.json', 'w') as outfile:
         json.dump(graph_dict, outfile)
 
     try:
 
-      putfilekeys=list(s3_presigned_dict['put'].keys())
-      modelputfiles = [s for s in putfilekeys if str('model_graph_'+str(model_version)+'.json') in s]
+        putfilekeys = list(s3_presigned_dict['put'].keys())
+        modelputfiles = [
+            s for s in putfilekeys if str(
+                'model_graph_' +
+                str(model_version) +
+                '.json') in s]
 
-      fileputlistofdicts=[]
-      for i in modelputfiles:
-        filedownload_dict=ast.literal_eval(s3_presigned_dict ['put'][i])
-        fileputlistofdicts.append(filedownload_dict)
+        fileputlistofdicts = []
+        for i in modelputfiles:
+            filedownload_dict = ast.literal_eval(s3_presigned_dict['put'][i])
+            fileputlistofdicts.append(filedownload_dict)
 
-      with open(temp+"/"+'model_graph_'+str(model_version)+'.json', 'rb') as f:
-        files = {'file': (temp+"/"+'model_graph_'+str(model_version)+'.json', f)}
-        http_response = requests.post(fileputlistofdicts[0]['url'], data=fileputlistofdicts[0]['fields'], files=files)
-    except:
-      pass
+        with open(temp + "/" + 'model_graph_' + str(model_version) + '.json', 'rb') as f:
+            files = {
+                'file': (
+                    temp +
+                    "/" +
+                    'model_graph_' +
+                    str(model_version) +
+                    '.json',
+                    f)}
+            http_response = requests.post(
+                fileputlistofdicts[0]['url'],
+                data=fileputlistofdicts[0]['fields'],
+                files=files)
+    except BaseException:
+        pass
 
     return 1
 
@@ -556,12 +631,12 @@ def submit_model(
     reproducibility_env_filepath=None,
     custom_metadata=None,
     submission_type="competition",
-    input_dict = None,
+    input_dict=None,
     print_output=True
-    ):
+):
     """
     Submits model/preprocessor to machine learning competition using live prediction API url generated by AI Modelshare library
-    The submitted model gets evaluated and compared with all existing models and a leaderboard can be generated 
+    The submitted model gets evaluated and compared with all existing models and a leaderboard can be generated
     ---------------
     Parameters:
     modelpath:  string ends with '.onnx'
@@ -569,48 +644,46 @@ def submit_model(
                 .onnx is the only accepted model file extension
                 "example_model.onnx" filename for file in directory.
                 "/User/xyz/model/example_model.onnx" absolute path to model file from local directory
-    apiurl :    string 
-                value - url to the live prediction REST API generated for the user's model 
+    apiurl :    string
+                value - url to the live prediction REST API generated for the user's model
                 "https://example.execute-api.us-east-1.amazonaws.com/prod/m"
     prediction_submission:   one hot encoded y_pred
                     value - predictions for test data
                     [REQUIRED] for evaluation metriicts of the submitted model
     preprocessor:   string,default=None
-                    value - absolute path to preprocessor file 
+                    value - absolute path to preprocessor file
                     [REQUIRED] to be set by the user
-                    "./preprocessor.zip" 
+                    "./preprocessor.zip"
                     searches for an exported zip preprocessor file in the current directory
-                    file is generated from preprocessor module using export_preprocessor function from the AI Modelshare library 
+                    file is generated from preprocessor module using export_preprocessor function from the AI Modelshare library
     reproducibility_env_filepath: string
-                                value - absolute path to environment environment json file 
+                                value - absolute path to environment environment json file
                                 [OPTIONAL] to be set by the user
-                                "./reproducibility.json" 
+                                "./reproducibility.json"
                                 file is generated using export_reproducibility_env function from the AI Modelshare library
     -----------------
     Returns
     response:   Model version if the model is submitted sucessfully
                 error  if there is any error while submitting models
-    
+
     """
 
-    # catch missing model_input for pytorch 
+    # catch missing model_input for pytorch
     try:
         import torch
-        if isinstance(model_filepath, torch.nn.Module) and model_input==None:
-            raise ValueError("Please submit valid model_input for pytorch model.")
-    except:
+        if isinstance(model_filepath, torch.nn.Module) and model_input is None:
+            raise ValueError(
+                "Please submit valid model_input for pytorch model.")
+    except BaseException:
         pass
-
 
     # check whether preprocessor is function
     import types
-    if isinstance(preprocessor, types.FunctionType): 
+    if isinstance(preprocessor, types.FunctionType):
         from aimodelshare.preprocessormodules import export_preprocessor
-        temp_prep=tmp.mkdtemp()
-        export_preprocessor(preprocessor,temp_prep)
-        preprocessor = temp_prep+"/preprocessor.zip"
-
-
+        temp_prep = tmp.mkdtemp()
+        export_preprocessor(preprocessor, temp_prep)
+        preprocessor = temp_prep + "/preprocessor.zip"
 
     import os
     from aimodelshare.aws import get_aws_token
@@ -618,16 +691,16 @@ def submit_model(
     import ast
 
     # Confirm that creds are loaded, print warning if not
-    if all(["username" in os.environ, 
+    if all(["username" in os.environ,
             "password" in os.environ]):
         pass
     else:
-        return print("'Submit Model' unsuccessful. Please provide username and password using set_credentials() function.")
+        return print(
+            "'Submit Model' unsuccessful. Please provide username and password using set_credentials() function.")
 
+    # ---Step 2: Get bucket and model_id for playground and check prediction submission structure
 
-    ##---Step 2: Get bucket and model_id for playground and check prediction submission structure
-
-    apiurl=apiurl.replace('"','')
+    apiurl = apiurl.replace('"', '')
 
     # Get bucket and model_id for user {{{
     response, error = run_function_on_lambda(
@@ -639,21 +712,21 @@ def submit_model(
     _, bucket, model_id = json.loads(response.content.decode("utf-8"))
     # }}}
 
-    #begin replacing code here
-    #add call to eval lambda here to retrieve presigned urls and eval metrics
+    # begin replacing code here
+    # add call to eval lambda here to retrieve presigned urls and eval metrics
     if prediction_submission is not None:
         if type(prediction_submission) is not list:
-            prediction_submission=prediction_submission.tolist()
-        else: 
+            prediction_submission = prediction_submission.tolist()
+        else:
             pass
 
         if all(isinstance(x, (np.float64)) for x in prediction_submission):
-              prediction_submission = [float(i) for i in prediction_submission]
-        else: 
+            prediction_submission = [float(i) for i in prediction_submission]
+        else:
             pass
 
-    ##---Step 3: Attempt to get eval metrics and file access dict for model leaderboard submission
-    #includes checks if returned values a success and errors otherwise
+    # ---Step 3: Attempt to get eval metrics and file access dict for model leaderboard submission
+    # includes checks if returned values a success and errors otherwise
 
     import os
     import pickle
@@ -662,129 +735,167 @@ def submit_model(
 
     fileObject = open(predictions_path, 'wb')
     pickle.dump(prediction_submission, fileObject)
-    predfilesize=os.path.getsize(predictions_path)
+    predfilesize = os.path.getsize(predictions_path)
 
     fileObject.close()
 
-    if predfilesize>3555000:
+    if predfilesize > 3555000:
 
         post_dict = {"y_pred": [],
-              "return_eval_files": "True",
-              "submission_type": submission_type,
-              "return_y": "False"}
+                     "return_eval_files": "True",
+                     "submission_type": submission_type,
+                     "return_y": "False"}
 
-        headers = { 'Content-Type':'application/json', 'authorizationToken': json.dumps({"token":os.environ.get("AWS_TOKEN"),"eval":"TEST"}), } 
-        apiurl_eval=apiurl[:-1]+"eval"
-        predictionfiles = requests.post(apiurl_eval,headers=headers,data=json.dumps(post_dict)) 
-        eval_metrics=json.loads(predictionfiles.text)
+        headers = {
+            'Content-Type': 'application/json',
+            'authorizationToken': json.dumps(
+                {
+                    "token": os.environ.get("AWS_TOKEN"),
+                    "eval": "TEST"}),
+        }
+        apiurl_eval = apiurl[:-1] + "eval"
+        predictionfiles = requests.post(
+            apiurl_eval, headers=headers, data=json.dumps(post_dict))
+        eval_metrics = json.loads(predictionfiles.text)
 
-        s3_presigned_dict = {key:val for key, val in eval_metrics.items() if key != 'eval'}
+        s3_presigned_dict = {key: val for key,
+                             val in eval_metrics.items() if key != 'eval'}
 
-        idempotentmodel_version=s3_presigned_dict['idempotentmodel_version']
+        idempotentmodel_version = s3_presigned_dict['idempotentmodel_version']
         s3_presigned_dict.pop('idempotentmodel_version')
-            #upload preprocessor (1s for small upload vs 21 for 306 mbs)
-        putfilekeys=list(s3_presigned_dict['put'].keys())
+        # upload preprocessor (1s for small upload vs 21 for 306 mbs)
+        putfilekeys = list(s3_presigned_dict['put'].keys())
         modelputfiles = [s for s in putfilekeys if str("pkl") in s]
 
-        fileputlistofdicts=[]
+        fileputlistofdicts = []
         for i in modelputfiles:
-          filedownload_dict=ast.literal_eval(s3_presigned_dict ['put'][i])
-          fileputlistofdicts.append(filedownload_dict)
+            filedownload_dict = ast.literal_eval(s3_presigned_dict['put'][i])
+            fileputlistofdicts.append(filedownload_dict)
 
+        with open(predictions_path, 'rb') as f:
+            files = {'file': (predictions_path, f)}
+            http_response = requests.post(
+                fileputlistofdicts[0]['url'],
+                data=fileputlistofdicts[0]['fields'],
+                files=files)
+            f.close()
 
-        with open(predictions_path , 'rb') as f:
-                files = {'file': (predictions_path , f)} 
-                http_response = requests.post(fileputlistofdicts[0]['url'], data=fileputlistofdicts[0]['fields'], files=files)
-                f.close()
+        post_dict = {
+            "y_pred": [],
+            "predictionpklname": fileputlistofdicts[0]['fields']['key'].split("/")[2],
+            "submission_type": submission_type,
+            "return_y": "False",
+            "return_eval": "True"}
 
-        post_dict = {"y_pred": [],
-                    "predictionpklname":fileputlistofdicts[0]['fields']['key'].split("/")[2],
-                "submission_type": submission_type,
-                "return_y": "False",
-                "return_eval": "True"}
-
-        headers = { 'Content-Type':'application/json', 'authorizationToken': json.dumps({"token":os.environ.get("AWS_TOKEN"),"eval":"TEST"}), } 
-        apiurl_eval=apiurl[:-1]+"eval"
-        prediction = requests.post(apiurl_eval,headers=headers,data=json.dumps(post_dict))
+        headers = {
+            'Content-Type': 'application/json',
+            'authorizationToken': json.dumps(
+                {
+                    "token": os.environ.get("AWS_TOKEN"),
+                    "eval": "TEST"}),
+        }
+        apiurl_eval = apiurl[:-1] + "eval"
+        prediction = requests.post(
+            apiurl_eval,
+            headers=headers,
+            data=json.dumps(post_dict))
 
     else:
 
         post_dict = {"y_pred": prediction_submission,
-                "return_eval": "True",
-                "submission_type": submission_type,
-                "return_y": "False"}
+                     "return_eval": "True",
+                     "submission_type": submission_type,
+                     "return_y": "False"}
 
-        headers = { 'Content-Type':'application/json', 'authorizationToken': json.dumps({"token":os.environ.get("AWS_TOKEN"),"eval":"TEST"}), } 
-        apiurl_eval=apiurl[:-1]+"eval"
+        headers = {
+            'Content-Type': 'application/json',
+            'authorizationToken': json.dumps(
+                {
+                    "token": os.environ.get("AWS_TOKEN"),
+                    "eval": "TEST"}),
+        }
+        apiurl_eval = apiurl[:-1] + "eval"
         import requests
-        prediction = requests.post(apiurl_eval,headers=headers,data=json.dumps(post_dict)) 
+        prediction = requests.post(
+            apiurl_eval,
+            headers=headers,
+            data=json.dumps(post_dict))
 
-    eval_metrics=json.loads(prediction.text)
-
+    eval_metrics = json.loads(prediction.text)
 
     eval_metrics_private = {"eval": eval_metrics['eval'][1]}
-    eval_metrics["eval"] = eval_metrics['eval'][0] 
+    eval_metrics["eval"] = eval_metrics['eval'][0]
 
-    if all([isinstance(eval_metrics, dict),"message" not in eval_metrics]):
-        pass        
+    if all([isinstance(eval_metrics, dict), "message" not in eval_metrics]):
+        pass
     else:
         if all([isinstance(eval_metrics, list)]):
             print(eval_metrics[0])
         else:
-            return print('Unauthorized user: You do not have access to submit models to, or request data from, this competition.')
+            return print(
+                'Unauthorized user: You do not have access to submit models to, or request data from, this competition.')
 
+    if all(value is None for value in eval_metrics.values()):
+        return print(
+            "Failed to calculate evaluation metrics. Please check the format of the submitted predictions.")
 
-    if all(value == None for value in eval_metrics.values()):
-        return print("Failed to calculate evaluation metrics. Please check the format of the submitted predictions.")
+    s3_presigned_dict = {
+        key: val for key,
+        val in eval_metrics.items() if key != 'eval'}
 
-    s3_presigned_dict = {key:val for key, val in eval_metrics.items() if key != 'eval'}
-
-    idempotentmodel_version=s3_presigned_dict['idempotentmodel_version']
+    idempotentmodel_version = s3_presigned_dict['idempotentmodel_version']
     s3_presigned_dict.pop('idempotentmodel_version')
 
-    eval_metrics = {key:val for key, val in eval_metrics.items() if key != 'get'}
-    eval_metrics = {key:val for key, val in eval_metrics.items() if key != 'put'}
+    eval_metrics = {
+        key: val for key,
+        val in eval_metrics.items() if key != 'get'}
+    eval_metrics = {
+        key: val for key,
+        val in eval_metrics.items() if key != 'put'}
 
-    eval_metrics_private = {key:val for key, val in eval_metrics_private.items() if key != 'get'}
-    eval_metrics_private = {key:val for key, val in eval_metrics_private.items() if key != 'put'}
+    eval_metrics_private = {
+        key: val for key,
+        val in eval_metrics_private.items() if key != 'get'}
+    eval_metrics_private = {
+        key: val for key,
+        val in eval_metrics_private.items() if key != 'put'}
 
-
-    if eval_metrics.get("eval","empty")=="empty":
-      pass
+    if eval_metrics.get("eval", "empty") == "empty":
+        pass
     else:
-      eval_metrics=eval_metrics['eval']
+        eval_metrics = eval_metrics['eval']
 
-
-    if eval_metrics_private.get("eval","empty")=="empty":
-      pass
+    if eval_metrics_private.get("eval", "empty") == "empty":
+        pass
     else:
-      eval_metrics_private=eval_metrics_private['eval']
+        eval_metrics_private = eval_metrics_private['eval']
 
-
-    #upload preprocessor (1s for small upload vs 21 for 306 mbs)
-    putfilekeys=list(s3_presigned_dict['put'].keys())
+    # upload preprocessor (1s for small upload vs 21 for 306 mbs)
+    putfilekeys = list(s3_presigned_dict['put'].keys())
     modelputfiles = [s for s in putfilekeys if str("zip") in s]
 
-    fileputlistofdicts=[]
+    fileputlistofdicts = []
     for i in modelputfiles:
-      filedownload_dict=ast.literal_eval(s3_presigned_dict ['put'][i])
-      fileputlistofdicts.append(filedownload_dict)
+        filedownload_dict = ast.literal_eval(s3_presigned_dict['put'][i])
+        fileputlistofdicts.append(filedownload_dict)
     import requests
-    if preprocessor is not None: 
+    if preprocessor is not None:
         with open(preprocessor, 'rb') as f:
-          files = {'file': (preprocessor, f)}
-          http_response = requests.post(fileputlistofdicts[0]['url'], data=fileputlistofdicts[0]['fields'], files=files)
+            files = {'file': (preprocessor, f)}
+            http_response = requests.post(
+                fileputlistofdicts[0]['url'],
+                data=fileputlistofdicts[0]['fields'],
+                files=files)
 
-    putfilekeys=list(s3_presigned_dict['put'].keys())
+    putfilekeys = list(s3_presigned_dict['put'].keys())
     modelputfiles = [s for s in putfilekeys if str("onnx") in s]
 
-    fileputlistofdicts=[]
+    fileputlistofdicts = []
     for i in modelputfiles:
-      filedownload_dict=ast.literal_eval(s3_presigned_dict ['put'][i])
-      fileputlistofdicts.append(filedownload_dict)
+        filedownload_dict = ast.literal_eval(s3_presigned_dict['put'][i])
+        fileputlistofdicts.append(filedownload_dict)
 
-
-    if not (model_filepath == None or isinstance(model_filepath, str)): 
+    if not (model_filepath is None or isinstance(model_filepath, str)):
 
         if isinstance(model_filepath, onnx.ModelProto):
             onnx_model = model_filepath
@@ -792,15 +903,16 @@ def submit_model(
             print("Transform model object to onnx.")
             try:
                 import torch
-                if isinstance(model_filepath, torch.nn.Module) and model_input==None:
-                    onnx_model = model_to_onnx(model_filepath, model_input=model_input)
-            except:
+                if isinstance(model_filepath,
+                              torch.nn.Module) and model_input is None:
+                    onnx_model = model_to_onnx(
+                        model_filepath, model_input=model_input)
+            except BaseException:
                 onnx_model = model_to_onnx(model_filepath)
                 pass
 
-
-        temp_prep=tmp.mkdtemp()
-        model_filepath = temp_prep+"/model.onnx"
+        temp_prep = tmp.mkdtemp()
+        model_filepath = temp_prep + "/model.onnx"
         with open(model_filepath, "wb") as f:
             f.write(onnx_model.SerializeToString())
 
@@ -808,34 +920,38 @@ def submit_model(
     else:
         load_onnx_from_path = True
 
-
     if model_filepath is not None:
         with open(model_filepath, 'rb') as f:
-          files = {'file': (model_filepath, f)}
-          http_response = requests.post(fileputlistofdicts[1]['url'], data=fileputlistofdicts[1]['fields'], files=files)
+            files = {'file': (model_filepath, f)}
+            http_response = requests.post(
+                fileputlistofdicts[1]['url'],
+                data=fileputlistofdicts[1]['fields'],
+                files=files)
 
-
-    putfilekeys=list(s3_presigned_dict['put'].keys())
+    putfilekeys = list(s3_presigned_dict['put'].keys())
     modelputfiles = [s for s in putfilekeys if str("reproducibility") in s]
 
-    fileputlistofdicts=[]
+    fileputlistofdicts = []
     for i in modelputfiles:
-      filedownload_dict=ast.literal_eval(s3_presigned_dict ['put'][i])
-      fileputlistofdicts.append(filedownload_dict)
+        filedownload_dict = ast.literal_eval(s3_presigned_dict['put'][i])
+        fileputlistofdicts.append(filedownload_dict)
 
     if reproducibility_env_filepath:
         with open(reproducibility_env_filepath, 'rb') as f:
-          files = {'file': (reproducibility_env_filepath, f)}
-          http_response = requests.post(fileputlistofdicts[0]['url'], data=fileputlistofdicts[0]['fields'], files=files)
+            files = {'file': (reproducibility_env_filepath, f)}
+            http_response = requests.post(
+                fileputlistofdicts[0]['url'],
+                data=fileputlistofdicts[0]['fields'],
+                files=files)
 
     # Model metadata upload
     if model_filepath:
-        putfilekeys=list(s3_presigned_dict['put'].keys())
+        putfilekeys = list(s3_presigned_dict['put'].keys())
         modelputfiles = [s for s in putfilekeys if str("model_metadata") in s]
 
-        fileputlistofdicts=[]
+        fileputlistofdicts = []
         for i in modelputfiles:
-            filedownload_dict=ast.literal_eval(s3_presigned_dict ['put'][i])
+            filedownload_dict = ast.literal_eval(s3_presigned_dict['put'][i])
             fileputlistofdicts.append(filedownload_dict)
 
         if load_onnx_from_path:
@@ -855,8 +971,10 @@ def submit_model(
 
         with open(model_metadata_path, 'rb') as f:
             files = {'file': (model_metadata_path, f)}
-            http_response = requests.post(fileputlistofdicts[0]['url'], data=fileputlistofdicts[0]['fields'], files=files)
-
+            http_response = requests.post(
+                fileputlistofdicts[0]['url'],
+                data=fileputlistofdicts[0]['fields'],
+                files=files)
 
     # Upload model metrics and metadata {{{
     if load_onnx_from_path:
@@ -865,113 +983,156 @@ def submit_model(
 
         # Upload model metrics and metadata {{{
         modelleaderboarddata_private = _update_leaderboard_public(
-            model_filepath, eval_metrics_private, s3_presigned_dict, custom_metadata, private=True)
+            model_filepath,
+            eval_metrics_private,
+            s3_presigned_dict,
+            custom_metadata,
+            private=True)
     else:
         modelleaderboarddata = _update_leaderboard_public(
             None, eval_metrics, s3_presigned_dict, custom_metadata, onnx_model=onnx_model)
 
         # Upload model metrics and metadata {{{
         modelleaderboarddata_private = _update_leaderboard_public(
-            None, eval_metrics_private, s3_presigned_dict, custom_metadata, private=True, onnx_model=onnx_model)
+            None,
+            eval_metrics_private,
+            s3_presigned_dict,
+            custom_metadata,
+            private=True,
+            onnx_model=onnx_model)
 
-
-    model_versions = [os.path.splitext(f)[0].split("_")[-1][1:] for f in s3_presigned_dict['put'].keys()]
+    model_versions = [os.path.splitext(f)[0].split(
+        "_")[-1][1:] for f in s3_presigned_dict['put'].keys()]
 
     model_versions = filter(lambda v: v.isnumeric(), model_versions)
     model_versions = list(map(int, model_versions))
-    model_version=model_versions[0]
-
+    model_version = model_versions[0]
 
     if load_onnx_from_path:
         if model_filepath is not None:
 
-            upload_model_dict(model_filepath, s3_presigned_dict, bucket, model_id, model_version)
+            upload_model_dict(
+                model_filepath,
+                s3_presigned_dict,
+                bucket,
+                model_id,
+                model_version)
 
-            upload_model_graph(model_filepath, s3_presigned_dict, bucket, model_id, model_version)
+            upload_model_graph(
+                model_filepath,
+                s3_presigned_dict,
+                bucket,
+                model_id,
+                model_version)
 
         else:
 
-            upload_model_dict(model_filepath, s3_presigned_dict, bucket, model_id, model_version, placeholder=True) 
+            upload_model_dict(
+                model_filepath,
+                s3_presigned_dict,
+                bucket,
+                model_id,
+                model_version,
+                placeholder=True)
     else:
 
-            upload_model_dict(None, s3_presigned_dict, bucket, model_id, model_version, onnx_model=onnx_model)
+        upload_model_dict(
+            None,
+            s3_presigned_dict,
+            bucket,
+            model_id,
+            model_version,
+            onnx_model=onnx_model)
 
-            upload_model_graph(None, s3_presigned_dict, bucket, model_id, model_version, onnx_model=onnx_model)
+        upload_model_graph(
+            None,
+            s3_presigned_dict,
+            bucket,
+            model_id,
+            model_version,
+            onnx_model=onnx_model)
 
-    modelpath=model_filepath
+    modelpath = model_filepath
 
     def dict_clean(items):
-      result = {}
-      for key, value in items:
-          if value is None:
-              value = '0'
-          result[key] = value
-      return result
+        result = {}
+        for key, value in items:
+            if value is None:
+                value = '0'
+            result[key] = value
+        return result
 
     if isinstance(modelleaderboarddata, Exception):
-      raise err
+        raise err
 
     else:
-      dict_str = json.dumps(modelleaderboarddata)
-    #convert None type values to string
-      modelleaderboarddata_cleaned = json.loads(dict_str, object_pairs_hook=dict_clean)
-
+        dict_str = json.dumps(modelleaderboarddata)
+    # convert None type values to string
+        modelleaderboarddata_cleaned = json.loads(
+            dict_str, object_pairs_hook=dict_clean)
 
     if isinstance(modelleaderboarddata_private, Exception):
-      raise err
+        raise err
     else:
-      dict_str = json.dumps(modelleaderboarddata_private)
-    #convert None type values to string
-      modelleaderboarddata_private_cleaned = json.loads(dict_str, object_pairs_hook=dict_clean)
+        dict_str = json.dumps(modelleaderboarddata_private)
+    # convert None type values to string
+        modelleaderboarddata_private_cleaned = json.loads(
+            dict_str, object_pairs_hook=dict_clean)
 
     # Update model version and sample data {{{
     #data_types = None
     #data_columns = None
-    #if sample_data is not None and isinstance(sample_data, pd.DataFrame):
+    # if sample_data is not None and isinstance(sample_data, pd.DataFrame):
     #    data_types = list(sample_data.dtypes.values.astype(str))
     #    data_columns = list(sample_data.columns)
 
-    #kwargs = {
+    # kwargs = {
     #    "delete": "FALSE",
     #    "versionupdateget": "FALSE",
     #    "versionupdateput": "TRUE",
     #    "version": model_version,
     #    "input_feature_dtypes": data_types,
     #    "input_feature_names": data_columns,
-    #}
+    # }
     #response, error = run_function_on_lambda(apiurl, aws_token, **kwargs)
-    #if error is not None:
+    # if error is not None:
     #    raise error
     # }}}
 
-    if input_dict == None:
-        modelsubmissiontags=input("Insert search tags to help users find your model (optional): ")
-        modelsubmissiondescription=input("Provide any useful notes about your model (optional): ")
+    if input_dict is None:
+        modelsubmissiontags = input(
+            "Insert search tags to help users find your model (optional): ")
+        modelsubmissiondescription = input(
+            "Provide any useful notes about your model (optional): ")
     else:
         modelsubmissiontags = input_dict["tags"]
-        modelsubmissiondescription = input_dict["description"] 
+        modelsubmissiondescription = input_dict["description"]
 
-
-    if submission_type=="competition":
-        experimenttruefalse="FALSE"
+    if submission_type == "competition":
+        experimenttruefalse = "FALSE"
     else:
-        experimenttruefalse="TRUE"
+        experimenttruefalse = "TRUE"
 
-    #Update competition or experiment data
+    # Update competition or experiment data
     bodydata = {"apiurl": apiurl,
                 "submissions": model_version,
-                  "contributoruniquenames":os.environ.get('username'),
-                "versionupdateputsubmit":"TRUE",
-                 "experiment":experimenttruefalse
-                                }
+                "contributoruniquenames": os.environ.get('username'),
+                "versionupdateputsubmit": "TRUE",
+                "experiment": experimenttruefalse
+                }
 
     # Get the response
-    headers_with_authentication = {'Content-Type': 'application/json', 'authorizationToken': os.environ.get("AWS_TOKEN"), 'Access-Control-Allow-Headers':
-                                    'Content-Type,X-Amz-Date,authorizationToken,Access-Control-Allow-Origin,X-Api-Key,X-Amz-Security-Token,Authorization', 'Access-Control-Allow-Origin': '*'}
-    # competitiondata lambda function invoked through below url to update model submissions and contributors
-    requests.post("https://o35jwfakca.execute-api.us-east-1.amazonaws.com/dev/modeldata",
-                  json=bodydata, headers=headers_with_authentication)
-
+    headers_with_authentication = {
+        'Content-Type': 'application/json',
+        'authorizationToken': os.environ.get("AWS_TOKEN"),
+        'Access-Control-Allow-Headers': 'Content-Type,X-Amz-Date,authorizationToken,Access-Control-Allow-Origin,X-Api-Key,X-Amz-Security-Token,Authorization',
+        'Access-Control-Allow-Origin': '*'}
+    # competitiondata lambda function invoked through below url to update
+    # model submissions and contributors
+    requests.post(
+        "https://o35jwfakca.execute-api.us-east-1.amazonaws.com/dev/modeldata",
+        json=bodydata,
+        headers=headers_with_authentication)
 
     if modelpath is not None:
 
@@ -989,42 +1150,43 @@ def submit_model(
 
             inspect_pd = _model_summary(meta_dict)
             model_graph = ""
-            
+
         elif meta_dict['ml_framework'] in ['sklearn', 'xgboost']:
             import ast
             import astunparse
             model_config = meta_dict["model_config"]
             tree = ast.parse(model_config)
 
-            stringconfig=model_config
+            stringconfig = model_config
 
-            problemnodes=[]
+            problemnodes = []
             for node in ast.walk(tree):
                 if isinstance(node, ast.Call):
-                    problemnodes.append(astunparse.unparse(node).replace("\n",""))
+                    problemnodes.append(
+                        astunparse.unparse(node).replace(
+                            "\n", ""))
 
-            problemnodesunique=set(problemnodes)
+            problemnodesunique = set(problemnodes)
             for i in problemnodesunique:
-                stringconfig=stringconfig.replace(i,"'"+i+"'")
+                stringconfig = stringconfig.replace(i, "'" + i + "'")
 
             try:
-                model_config=ast.literal_eval(stringconfig)
+                model_config = ast.literal_eval(stringconfig)
                 model_class = model_from_string(meta_dict['model_type'])
                 default = model_class()
                 default_config = default.get_params().values()
-                model_configkeys=model_config.keys()
-                model_configvalues=model_config.values()
-            except:
+                model_configkeys = model_config.keys()
+                model_configvalues = model_config.values()
+            except BaseException:
                 model_class = str(model_from_string(meta_dict['model_type']))
-                if model_class.find("Voting")>0:
-                      default_config = ["No data available"]
-                      model_configkeys=["No data available"]
-                      model_configvalues=["No data available"]
-
+                if model_class.find("Voting") > 0:
+                    default_config = ["No data available"]
+                    model_configkeys = ["No data available"]
+                    model_configvalues = ["No data available"]
 
             inspect_pd = pd.DataFrame({'param_name': model_configkeys,
-                                        'default_value': default_config,
-                                        'param_value': model_configvalues})
+                                       'default_value': default_config,
+                                       'param_value': model_configvalues})
 
             model_graph = ''
 
@@ -1035,73 +1197,93 @@ def submit_model(
             model_config = meta_dict["model_config"]
             tree = ast.parse(model_config)
 
-            stringconfig=model_config
+            stringconfig = model_config
 
-            problemnodes=[]
+            problemnodes = []
             for node in ast.walk(tree):
                 if isinstance(node, ast.Call):
-                    problemnodes.append(astunparse.unparse(node).replace("\n",""))
+                    problemnodes.append(
+                        astunparse.unparse(node).replace(
+                            "\n", ""))
 
-            problemnodesunique=set(problemnodes)
+            problemnodesunique = set(problemnodes)
             for i in problemnodesunique:
-                stringconfig=stringconfig.replace(i,"'"+i+"'")
+                stringconfig = stringconfig.replace(i, "'" + i + "'")
 
             try:
                 model_config_temp = ast.literal_eval(stringconfig)
-                model_class = pyspark_model_from_string(meta_dict['model_type'])
+                model_class = pyspark_model_from_string(
+                    meta_dict['model_type'])
                 default = model_class()
 
                 # get model config dict from pyspark model object
                 default_config_temp = {}
                 for key, value in default.extractParamMap().items():
                     default_config_temp[key.name] = value
-                
-                # Sort the keys so default and model config key matches each other
+
+                # Sort the keys so default and model config key matches each
+                # other
                 model_config = dict(sorted(model_config_temp.items()))
                 default_config = dict(sorted(default_config_temp.items()))
-                
+
                 model_configkeys = model_config.keys()
                 model_configvalues = model_config.values()
                 default_config = default_config.values()
-            except:
-                model_class = str(pyspark_model_from_string(meta_dict['model_type']))
-                if model_class.find("Voting")>0:
-                      default_config = ["No data available"]
-                      model_configkeys=["No data available"]
-                      model_configvalues=["No data available"]
+            except BaseException:
+                model_class = str(
+                    pyspark_model_from_string(
+                        meta_dict['model_type']))
+                if model_class.find("Voting") > 0:
+                    default_config = ["No data available"]
+                    model_configkeys = ["No data available"]
+                    model_configvalues = ["No data available"]
 
             inspect_pd = pd.DataFrame({'param_name': model_configkeys,
-                                    'default_value': default_config,
-                                    'param_value': model_configvalues})
+                                       'default_value': default_config,
+                                       'param_value': model_configvalues})
             model_graph = ""
-    else: 
+    else:
 
         inspect_pd = pd.DataFrame()
         model_graph = ''
-        
-        
-    keys_to_extract = [ "accuracy", "f1_score", "precision", "recall", "mse", "rmse", "mae", "r2"]
+
+    keys_to_extract = [
+        "accuracy",
+        "f1_score",
+        "precision",
+        "recall",
+        "mse",
+        "rmse",
+        "mae",
+        "r2"]
 
     eval_metrics_subset = {key: eval_metrics[key] for key in keys_to_extract}
-    eval_metrics_private_subset = {key: eval_metrics_private[key] for key in keys_to_extract}
+    eval_metrics_private_subset = {
+        key: eval_metrics_private[key] for key in keys_to_extract}
 
-    eval_metrics_subset_nonulls = {key: value for key, value in eval_metrics_subset.items() if isinstance(value, float)}
-    eval_metrics_private_subset_nonulls = {key: value for key, value in eval_metrics_private_subset.items() if isinstance(value, float)}
+    eval_metrics_subset_nonulls = {
+        key: value for key,
+        value in eval_metrics_subset.items() if isinstance(
+            value,
+            float)}
+    eval_metrics_private_subset_nonulls = {
+        key: value for key,
+        value in eval_metrics_private_subset.items() if isinstance(
+            value,
+            float)}
 
-                              
-    #Update model architecture data
+    # Update model architecture data
     bodydatamodels = {
-                "apiurl": apiurl,
-                "modelsummary":json.dumps(inspect_pd.to_json()),
-                "model_graph": model_graph,
-                "Private":"FALSE",
-                "modelsubmissiondescription": modelsubmissiondescription,
-                "modelsubmissiontags":modelsubmissiontags,
-                  "eval_metrics":json.dumps(eval_metrics_subset_nonulls),
-                  "eval_metrics_private":json.dumps(eval_metrics_private_subset_nonulls),
-                  "submission_type": submission_type
-
-                  }
+        "apiurl": apiurl,
+        "modelsummary": json.dumps(
+            inspect_pd.to_json()),
+        "model_graph": model_graph,
+        "Private": "FALSE",
+        "modelsubmissiondescription": modelsubmissiondescription,
+        "modelsubmissiontags": modelsubmissiontags,
+        "eval_metrics": json.dumps(eval_metrics_subset_nonulls),
+        "eval_metrics_private": json.dumps(eval_metrics_private_subset_nonulls),
+        "submission_type": submission_type}
 
     bodydatamodels.update(modelleaderboarddata_cleaned)
     bodydatamodels.update(modelleaderboarddata_private_cleaned)
@@ -1110,87 +1292,117 @@ def submit_model(
 
     keys_values = d.items()
 
-
-    bodydatamodels_allstrings = {str(key): str(value) for key, value in keys_values}
-
-
+    bodydatamodels_allstrings = {
+        str(key): str(value) for key,
+        value in keys_values}
 
     # Get the response
-    headers_with_authentication = {'Content-Type': 'application/json', 'authorizationToken': os.environ.get("AWS_TOKEN"), 'Access-Control-Allow-Headers':
-                                    'Content-Type,X-Amz-Date,authorizationToken,Access-Control-Allow-Origin,X-Api-Key,X-Amz-Security-Token,Authorization', 'Access-Control-Allow-Origin': '*'}
-    # competitiondata lambda function invoked through below url to update model submissions and contributors
-    response=requests.post("https://eeqq8zuo9j.execute-api.us-east-1.amazonaws.com/dev/modeldata",
-                  json=bodydatamodels_allstrings, headers=headers_with_authentication)
-    
-    if str(response.status_code)=="200":
-        code_comp_result="To submit code used to create this model or to view current leaderboard navigate to Model Playground: \n\n https://www.modelshare.ai/detail/model:"+response.text.split(":")[1]  
+    headers_with_authentication = {
+        'Content-Type': 'application/json',
+        'authorizationToken': os.environ.get("AWS_TOKEN"),
+        'Access-Control-Allow-Headers': 'Content-Type,X-Amz-Date,authorizationToken,Access-Control-Allow-Origin,X-Api-Key,X-Amz-Security-Token,Authorization',
+        'Access-Control-Allow-Origin': '*'}
+    # competitiondata lambda function invoked through below url to update
+    # model submissions and contributors
+    response = requests.post(
+        "https://eeqq8zuo9j.execute-api.us-east-1.amazonaws.com/dev/modeldata",
+        json=bodydatamodels_allstrings,
+        headers=headers_with_authentication)
+
+    if str(response.status_code) == "200":
+        code_comp_result = "To submit code used to create this model or to view current leaderboard navigate to Model Playground: \n\n https://www.modelshare.ai/detail/model:" + \
+            response.text.split(":")[1]
     else:
-        code_comp_result="" #TODO: reponse 403 indicates that user needs to reset credentials.  Need to add a creds check to top of function.
+        # TODO: reponse 403 indicates that user needs to reset credentials.
+        # Need to add a creds check to top of function.
+        code_comp_result = ""
 
     if print_output:
-        return print("\nYour model has been submitted as model version "+str(model_version)+ "\n\n"+code_comp_result)
+        return print(
+            "\nYour model has been submitted as model version " +
+            str(model_version) +
+            "\n\n" +
+            code_comp_result)
     else:
-        return str(model_version), "https://www.modelshare.ai/detail/model:"+response.text.split(":")[1]
+        return str(model_version), "https://www.modelshare.ai/detail/model:" + \
+            response.text.split(":")[1]
 
-def update_runtime_model(apiurl, model_version=None, submission_type="competition"):
+
+def update_runtime_model(
+        apiurl,
+        model_version=None,
+        submission_type="competition"):
     """
     apiurl: string of API URL that the user wishes to edit
-    new_model_version: string of model version number (from leaderboard) to replace original model 
+    new_model_version: string of model version number (from leaderboard) to replace original model
     """
-    import os 
+    import os
     if os.environ.get("cloud_location") is not None:
-        cloudlocation=os.environ.get("cloud_location")
+        cloudlocation = os.environ.get("cloud_location")
     else:
-        cloudlocation="not set"
-    if "model_share"==cloudlocation:
-            def nonecheck(objinput=""):
-                if objinput==None:
-                  objinput="None"
-                else:
-                  objinput="'/tmp/"+objinput+"'"
-                return objinput
+        cloudlocation = "not set"
+    if "model_share" == cloudlocation:
+        def nonecheck(objinput=""):
+            if objinput is None:
+                objinput = "None"
+            else:
+                objinput = "'/tmp/" + objinput + "'"
+            return objinput
 
-            runtimemodstring="update_runtime_model('"+apiurl+"',"+str(model_version)+",submission_type='"+str(submission_type)+"')"
-            import base64
-            import requests
-            import json
+        runtimemodstring = "update_runtime_model('" + apiurl + "'," + str(
+            model_version) + ",submission_type='" + str(submission_type) + "')"
+        import base64
+        import requests
+        import json
 
-            api_url = "https://z4kvag4sxdnv2mvs2b6c4thzj40bxnuw.lambda-url.us-east-2.on.aws/"
+        api_url = "https://z4kvag4sxdnv2mvs2b6c4thzj40bxnuw.lambda-url.us-east-2.on.aws/"
 
-            data = json.dumps({"code": """from aimodelshare.model import update_runtime_model;"""+runtimemodstring, "zipfilename": "","username":os.environ.get("username"), "password":os.environ.get("password"),"token":os.environ.get("JWT_AUTHORIZATION_TOKEN"),"s3keyid":"xrjpv1i7xe"})
+        data = json.dumps(
+            {
+                "code": """from aimodelshare.model import update_runtime_model;""" +
+                runtimemodstring,
+                "zipfilename": "",
+                "username": os.environ.get("username"),
+                "password": os.environ.get("password"),
+                "token": os.environ.get("JWT_AUTHORIZATION_TOKEN"),
+                "s3keyid": "xrjpv1i7xe"})
 
-            headers = {"Content-Type": "application/json"}
+        headers = {"Content-Type": "application/json"}
 
-            response = requests.request("POST", api_url, headers = headers, data=data)
-            # Print response
-            result=json.loads(response.text)
+        response = requests.request(
+            "POST", api_url, headers=headers, data=data)
+        # Print response
+        result = json.loads(response.text)
 
-            for i in json.loads(result['body']):
-                print(i)
-    
+        for i in json.loads(result['body']):
+            print(i)
+
     else:
         # Confirm that creds are loaded, print warning if not
-        if all(["AWS_ACCESS_KEY_ID_AIMS" in os.environ, 
+        if all(["AWS_ACCESS_KEY_ID_AIMS" in os.environ,
                 "AWS_SECRET_ACCESS_KEY_AIMS" in os.environ,
                 "AWS_REGION_AIMS" in os.environ,
-              "username" in os.environ, 
-              "password" in os.environ]):
+                "username" in os.environ,
+                "password" in os.environ]):
             pass
         else:
-            return print("'Update Runtime Model' unsuccessful. Please provide credentials with set_credentials().")
+            return print(
+                "'Update Runtime Model' unsuccessful. Please provide credentials with set_credentials().")
 
         # Create user session
-        aws_client_and_resource=get_aws_client(aws_key=os.environ.get('AWS_ACCESS_KEY_ID_AIMS'), 
-                                  aws_secret=os.environ.get('AWS_SECRET_ACCESS_KEY_AIMS'), 
-                                  aws_region=os.environ.get('AWS_REGION_AIMS'))
+        aws_client_and_resource = get_aws_client(
+            aws_key=os.environ.get('AWS_ACCESS_KEY_ID_AIMS'),
+            aws_secret=os.environ.get('AWS_SECRET_ACCESS_KEY_AIMS'),
+            aws_region=os.environ.get('AWS_REGION_AIMS'))
         aws_client = aws_client_and_resource['client']
-        
-        user_sess = boto3.session.Session(aws_access_key_id=os.environ.get('AWS_ACCESS_KEY_ID_AIMS'), 
-                                          aws_secret_access_key=os.environ.get('AWS_SECRET_ACCESS_KEY_AIMS'), 
-                                          region_name=os.environ.get('AWS_REGION_AIMS'))
-        
+
+        user_sess = boto3.session.Session(
+            aws_access_key_id=os.environ.get('AWS_ACCESS_KEY_ID_AIMS'),
+            aws_secret_access_key=os.environ.get('AWS_SECRET_ACCESS_KEY_AIMS'),
+            region_name=os.environ.get('AWS_REGION_AIMS'))
+
         s3 = user_sess.resource('s3')
-        model_version=str(model_version)
+        model_version = str(model_version)
         # Get bucket and model_id for user based on apiurl {{{
         response, error = run_function_on_lambda(
             apiurl, **{"delete": "FALSE", "versionupdateget": "TRUE"}
@@ -1202,57 +1414,82 @@ def update_runtime_model(apiurl, model_version=None, submission_type="competitio
         # }}}
 
         try:
-            leaderboard = get_leaderboard(apiurl=apiurl, submission_type=submission_type)
+            leaderboard = get_leaderboard(
+                apiurl=apiurl, submission_type=submission_type)
 
             columns = leaderboard.columns
-            leaderboardversion=leaderboard[leaderboard['version']==int(model_version)]
-            leaderboardversion=leaderboardversion.dropna(axis=1)
+            leaderboardversion = leaderboard[leaderboard['version'] == int(
+                model_version)]
+            leaderboardversion = leaderboardversion.dropna(axis=1)
 
-            metric_names_subset=list(columns[0:4])
-            leaderboardversiondict=leaderboardversion.loc[:,metric_names_subset].to_dict('records')[0]
+            metric_names_subset = list(columns[0:4])
+            leaderboardversiondict = leaderboardversion.loc[:, metric_names_subset].to_dict('records')[
+                0]
 
         except Exception as err:
             raise err
 
         # Get file list for current bucket {{{
-        model_files, err = _get_file_list(aws_client, api_bucket, model_id+"/"+submission_type)
+        model_files, err = _get_file_list(
+            aws_client, api_bucket, model_id + "/" + submission_type)
         if err is not None:
             raise err
         # }}}
 
         # extract subfolder objects specific to the model id
-        folder = s3.meta.client.list_objects(Bucket=api_bucket, Prefix=model_id+"/"+submission_type+"/")
+        folder = s3.meta.client.list_objects(
+            Bucket=api_bucket, Prefix=model_id + "/" + submission_type + "/")
         bucket = s3.Bucket(api_bucket)
         file_list = [file['Key'] for file in folder['Contents']]
         s3 = boto3.resource('s3')
-        model_source_key = model_id+"/"+submission_type+"/onnx_model_v"+str(model_version)+".onnx"
-        preprocesor_source_key = model_id+"/"+submission_type+"/preprocessor_v"+str(model_version)+".zip"
+        model_source_key = model_id + "/" + submission_type + \
+            "/onnx_model_v" + str(model_version) + ".onnx"
+        preprocesor_source_key = model_id + "/" + submission_type + \
+            "/preprocessor_v" + str(model_version) + ".zip"
         model_copy_source = {
-              'Bucket': api_bucket,
-              'Key': model_source_key
-            }
+            'Bucket': api_bucket,
+            'Key': model_source_key
+        }
         preprocessor_copy_source = {
-              'Bucket': api_bucket,
-              'Key': preprocesor_source_key
-          }
-        # Sending correct model metrics to front end 
-        bodydatamodelmetrics={"apiurl":apiurl,
-                              "versionupdateput":"TRUE",
-                              "verified_metrics":"TRUE",
-                              "eval_metrics":json.dumps(leaderboardversiondict)}
+            'Bucket': api_bucket,
+            'Key': preprocesor_source_key
+        }
+        # Sending correct model metrics to front end
+        bodydatamodelmetrics = {
+            "apiurl": apiurl,
+            "versionupdateput": "TRUE",
+            "verified_metrics": "TRUE",
+            "eval_metrics": json.dumps(leaderboardversiondict)}
         import requests
-        headers = { 'Content-Type':'application/json', 'authorizationToken': os.environ.get("AWS_TOKEN"), } 
-        prediction = requests.post("https://bhrdesksak.execute-api.us-east-1.amazonaws.com/dev/modeldata",headers=headers,data=json.dumps(bodydatamodelmetrics)) 
+        headers = {'Content-Type': 'application/json',
+                   'authorizationToken': os.environ.get("AWS_TOKEN"), }
+        prediction = requests.post(
+            "https://bhrdesksak.execute-api.us-east-1.amazonaws.com/dev/modeldata",
+            headers=headers,
+            data=json.dumps(bodydatamodelmetrics))
 
-        # overwrite runtime_model.onnx file & runtime_preprocessor.zip files: 
-        if (model_source_key in file_list) & (preprocesor_source_key in file_list):
-            response = bucket.copy(model_copy_source, model_id+"/"+'runtime_model.onnx')
-            response = bucket.copy(preprocessor_copy_source, model_id+"/"+'runtime_preprocessor.zip')
-            return print('Runtime model & preprocessor for api: '+apiurl+" updated to model version "+model_version+".\n\nModel metrics are now updated and verified for this model playground.")
+        # overwrite runtime_model.onnx file & runtime_preprocessor.zip files:
+        if (model_source_key in file_list) & (
+                preprocesor_source_key in file_list):
+            response = bucket.copy(
+                model_copy_source,
+                model_id + "/" + 'runtime_model.onnx')
+            response = bucket.copy(
+                preprocessor_copy_source,
+                model_id + "/" + 'runtime_preprocessor.zip')
+            return print(
+                'Runtime model & preprocessor for api: ' +
+                apiurl +
+                " updated to model version " +
+                model_version +
+                ".\n\nModel metrics are now updated and verified for this model playground.")
         else:
             # the file resource to be the new runtime_model is not available
-            return print('New Runtime Model version ' + model_version + ' not found.')
-    
+            return print(
+                'New Runtime Model version ' +
+                model_version +
+                ' not found.')
+
 
 def _extract_model_metadata(model, eval_metrics=None):
     # Getting the model metadata {{{
@@ -1265,7 +1502,8 @@ def _extract_model_metadata(model, eval_metrics=None):
 
     metadata["num_nodes"] = len(graph.node)
     metadata["depth_test"] = len(graph.initializer)
-    metadata["num_params"] = sum(np.product(node.dims) for node in graph.initializer)
+    metadata["num_params"] = sum(np.product(node.dims)
+                                 for node in graph.initializer)
 
     # layers = ""
     # for node in graph.node:
@@ -1303,6 +1541,7 @@ def _extract_model_metadata(model, eval_metrics=None):
     # }}}
 
     return metadata
+
 
 __all__ = [
     submit_model,

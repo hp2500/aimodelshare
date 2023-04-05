@@ -78,26 +78,30 @@ def get_model_graph(graph, name=None, flow="LR"):
 
     return pydot_graph
 
-def form_timestamp(ts):
-  st = datetime.datetime.fromtimestamp(ts).strftime('%Y-%m-%d %H:%M:%S')
-  st2 = st.replace(" ","_")
-  st3 = st2.replace(":","_")
-  return st3
 
-#Pandas training data pointer (currently for data updates only)
+def form_timestamp(ts):
+    st = datetime.datetime.fromtimestamp(ts).strftime('%Y-%m-%d %H:%M:%S')
+    st2 = st.replace(" ", "_")
+    st3 = st2.replace(":", "_")
+    return st3
+
+# Pandas training data pointer (currently for data updates only)
+
+
 def extract_varnames_fromtrainingdata(trainingdata="default"):
-  import pandas as pd
-  import numpy as np
-  if isinstance(trainingdata, pd.DataFrame):
-    variabletypes=list(trainingdata.dtypes.values.astype(str)) # always use pandas dtypes
-    variablecolumns=list(trainingdata.columns)
-  else:
-    variabletypes=None
-    variablecolumns=None
-  return [variabletypes,variablecolumns]
+    import pandas as pd
+    import numpy as np
+    if isinstance(trainingdata, pd.DataFrame):
+        # always use pandas dtypes
+        variabletypes = list(trainingdata.dtypes.values.astype(str))
+        variablecolumns = list(trainingdata.columns)
+    else:
+        variabletypes = None
+        variablecolumns = None
+    return [variabletypes, variablecolumns]
+
 
 def _get_extension_from_filepath(Filepath):
-  Filename = os.path.basename(Filepath)
-  file_name, file_extension = os.path.splitext(Filename)
-  return file_extension
-
+    Filename = os.path.basename(Filepath)
+    file_name, file_extension = os.path.splitext(Filename)
+    return file_extension

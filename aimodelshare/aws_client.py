@@ -2,7 +2,8 @@ import time
 import json
 import boto3
 
-delay=2
+delay = 2
+
 
 class AWSClient():
 
@@ -19,17 +20,19 @@ class AWSClient():
 
     def get_repository_details(self, repository_name):
         try:
-            response = self.ecr_client.describe_repositories(repositoryNames=[repository_name])
+            response = self.ecr_client.describe_repositories(
+                repositoryNames=[repository_name])
             repository_details = response['repositories']
-        except:
+        except BaseException:
             repository_details = []
         return repository_details
 
     def get_image_details(self, repository_name, image_tag):
         try:
-            response = self.ecr_client.describe_images(repositoryName=repository_name, imageIds=[{'imageTag': image_tag}])
+            response = self.ecr_client.describe_images(
+                repositoryName=repository_name, imageIds=[{'imageTag': image_tag}])
             image_details = response['imageDetails']
-        except:
+        except BaseException:
             image_details = []
         return image_details
 
@@ -37,7 +40,7 @@ class AWSClient():
         try:
             response = self.iam_client.get_role(RoleName=role_name)
             role_details = response['Role']
-        except:
+        except BaseException:
             role_details = {}
         return role_details
 
@@ -45,15 +48,17 @@ class AWSClient():
         try:
             response = self.iam_client.get_policy(PolicyArn=policy_arn)
             policy_details = response['Policy']
-        except:
+        except BaseException:
             policy_details = {}
         return policy_details
 
     def detach_policies_from_role(self, role_name):
-        response = self.iam_client.list_attached_role_policies(RoleName=role_name)
+        response = self.iam_client.list_attached_role_policies(
+            RoleName=role_name)
         policies = response['AttachedPolicies']
         for policy in policies:
-            response = self.iam_client.detach_role_policy(RoleName=role_name, PolicyArn=policy['PolicyArn'])
+            response = self.iam_client.detach_role_policy(
+                RoleName=role_name, PolicyArn=policy['PolicyArn'])
             time.sleep(delay)
 
     def delete_iam_role(self, role_name):
@@ -61,7 +66,7 @@ class AWSClient():
             response = self.detach_policies_from_role(role_name)
             response = self.iam_client.delete_role(RoleName=role_name)
             time.sleep(delay)
-        
+
     def delete_iam_policy(self, policy_name):
         policy_arn = "arn:aws:iam::" + self.account_id + ":policy/" + policy_name
         if(len(self.get_policy_details(policy_arn))):
@@ -69,40 +74,51 @@ class AWSClient():
             time.sleep(delay)
 
     def create_iam_role(self, role_name, trust_relationship):
-        response = self.iam_client.create_role(RoleName=role_name, AssumeRolePolicyDocument=json.dumps(trust_relationship))
+        response = self.iam_client.create_role(
+            RoleName=role_name,
+            AssumeRolePolicyDocument=json.dumps(trust_relationship))
         time.sleep(delay)
 
     def create_iam_policy(self, policy_name, policy):
         policy_arn = "arn:aws:iam::" + self.account_id + ":policy/" + policy_name
-        response = self.iam_client.create_policy(PolicyName=policy_name, PolicyDocument=json.dumps(policy))
+        response = self.iam_client.create_policy(
+            PolicyName=policy_name, PolicyDocument=json.dumps(policy))
         time.sleep(delay)
 
     def attach_policy_to_role(self, role_name, policy_name):
         policy_arn = "arn:aws:iam::" + self.account_id + ":policy/" + policy_name
-        response = self.iam_client.attach_role_policy(RoleName = role_name, PolicyArn = policy_arn)
+        response = self.iam_client.attach_role_policy(
+            RoleName=role_name, PolicyArn=policy_arn)
         time.sleep(delay)
 
     def create_repository(self, repository_name):
-        response = self.ecr_client.create_repository(repositoryName=repository_name)
+        response = self.ecr_client.create_repository(
+            repositoryName=repository_name)
         time.sleep(delay)
 
     def delete_repository(self, repository_name):
         pass
         time.sleep(delay)
 
-    def upload_file_to_s3(self, local_file_path, bucket_name, bucket_file_path):
-        response = self.s3_client.upload_file(local_file_path, bucket_name, bucket_file_path)
+    def upload_file_to_s3(
+            self,
+            local_file_path,
+            bucket_name,
+            bucket_file_path):
+        response = self.s3_client.upload_file(
+            local_file_path, bucket_name, bucket_file_path)
         time.sleep(delay)
 
     def delete_file_from_s3(self, bucket_name, bucket_file_path):
-        response = self.s3_client.delete_object(Bucket=bucket_name, Key=bucket_file_path)
+        response = self.s3_client.delete_object(
+            Bucket=bucket_name, Key=bucket_file_path)
         time.sleep(delay)
 
     def create_s3_bucket(self, bucket_name, region):
         try:
-            response=self.s3_client.head_bucket(Bucket=bucket_name)
-        except:
-            if(region=="us-east-1"):
+            response = self.s3_client.head_bucket(Bucket=bucket_name)
+        except BaseException:
+            if(region == "us-east-1"):
                 response = self.s3_client.create_bucket(
                     ACL="private",
                     Bucket=bucket_name
@@ -116,9 +132,10 @@ class AWSClient():
                 )
         return response
 
-    ####################################################################################################
+    ##########################################################################
 
-    def add_invoke_resource_policy_to_lambda(self, lambda_function, statement_id, source_arn):
+    def add_invoke_resource_policy_to_lambda(
+            self, lambda_function, statement_id, source_arn):
         response = self.lambda_client.add_permission(
             FunctionName=lambda_function,
             StatementId=statement_id,
@@ -132,11 +149,17 @@ class AWSClient():
         try:
             response = self.apigateway_client.get_resources(restApiId=api_id)
             resources = response['items']
-        except:
+        except BaseException:
             resources = []
         return resources
 
-    def integration_setup(self, api_id, resource_id, uri_str, credentials, integration_response):
+    def integration_setup(
+            self,
+            api_id,
+            resource_id,
+            uri_str,
+            credentials,
+            integration_response):
         response_1 = self.apigateway_client.put_integration(
             restApiId=api_id,
             resourceId=resource_id,
