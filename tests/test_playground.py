@@ -2,18 +2,20 @@ from aimodelshare.playground import ModelPlayground
 from aimodelshare.aws import set_credentials
 import aimodelshare as ai
 from aimodelshare.data_sharing.utils import redo_with_write
-
 from unittest.mock import patch
-
 from sklearn.compose import ColumnTransformer
 from sklearn.pipeline import Pipeline
 from sklearn.impute import SimpleImputer
 from sklearn.preprocessing import StandardScaler, OneHotEncoder
 from sklearn.linear_model import LogisticRegression
-
 import shutil
 import os
 
+# set environment variables from credentials file when testing locally
+try:
+    set_credentials(credential_file="../../../credentials.txt", type="deploy_model")
+except EnvironmentError as e:
+    pass
 
 
 # def test_quickstart_sklearn():
@@ -98,9 +100,6 @@ def test_playground_sklearn():
     def preprocessor(data):
         preprocessed_data = preprocess.transform(data)
         return preprocessed_data
-
-    # check shape of X data after preprocessing it using our new function
-    preprocessor(X_train).shape
 
     # build model 1
     model = LogisticRegression(C=10, penalty='l1', solver='liblinear')
@@ -191,7 +190,7 @@ def test_playground_keras():
     # clean up credentials file
     os.remove("credentials.txt")
 
-    # # Download flower image data and and pretrained Keras models
+    # # Download flower image data and pretrained Keras models
     from aimodelshare.data_sharing.download_data import import_quickstart_data
     keras_model, y_train_labels = import_quickstart_data("flowers")
     keras_model_2, y_test_labels = import_quickstart_data(

@@ -1,25 +1,17 @@
 # import packages
 import os
-import contextlib
-import boto3
-from aimodelshare.api import get_api_json
 import tempfile
-
 try:
     import torch
 except BaseException:
     pass
-import onnx
 from aimodelshare.utils import HiddenPrints
-import signal
-from aimodelshare.aimsonnx import model_to_onnx, model_to_onnx_timed
-from aimodelshare.tools import extract_varnames_fromtrainingdata, _get_extension_from_filepath
-import time
+from aimodelshare.aimsonnx import model_to_onnx_timed
+from aimodelshare.tools import extract_varnames_fromtrainingdata
 import numpy as np
 import json
 import pandas
 import requests
-from aimodelshare.aws import get_aws_token
 
 
 class ModelPlayground:
@@ -965,110 +957,7 @@ class ModelPlayground:
                 pass
 
             # model competition files
-            def upload_comp_exp_zipfile(
-                    data_directory,
-                    y_test=None,
-                    eval_metric_filepath=None,
-                    email_list=[]):
-                """
-                minimally requires model_filepath, preprocessor_filepath
-                """
-                zipfilelist = [data_directory]
-
-                import json
-                import os
-                import requests
-                import pandas as pd
-                if eval_metric_filepath is None:
-                    pass
-                else:
-                    zipfilelist.append(eval_metric_filepath)
-
-                # need to save dict pkl file with arg name and filepaths to add
-                # to zipfile
-
-                apiurl = "https://djoehnv623.execute-api.us-east-2.amazonaws.com/prod/m"
-
-                apiurl_eval = apiurl[:-1] + "eval"
-
-                headers = {
-                    'Content-Type': 'application/json',
-                    'authorizationToken': json.dumps(
-                        {
-                            "token": os.environ.get("AWS_TOKEN"),
-                            "eval": "TEST"}),
-                }
-                post_dict = {"return_zip": "True"}
-                zipfile = requests.post(
-                    apiurl_eval, headers=headers, data=json.dumps(post_dict))
-
-                zipfileputlistofdicts = json.loads(zipfile.text)['put']
-
-                zipfilename = list(zipfileputlistofdicts.keys())[0]
-
-                from zipfile import ZipFile
-                import os
-                from os.path import basename
-                import tempfile
-
-                wkingdir = os.getcwd()
-
-                tempdir = tempfile.gettempdir()
-
-                zipObj = ZipFile(tempdir + "/" + zipfilename, 'w')
-                # Add multiple files to the zip
-
-                for i in zipfilelist:
-                    for dirname, subdirs, files in os.walk(i):
-                        zipObj.write(dirname)
-                        for filename in files:
-                            zipObj.write(os.path.join(dirname, filename))
-                    # zipObj.write(i)
-
-                # add object to pkl file pathway here. (saving y label data)
-                import pickle
-
-                if y_test is None:
-                    pass
-                else:
-                    with open(tempdir + "/" + 'ytest.pkl', 'wb') as f:
-                        pickle.dump(y_test, f)
-
-                    os.chdir(tempdir)
-                    zipObj.write('ytest.pkl')
-
-                if isinstance(email_list, list):
-                    with open(tempdir + "/" + 'emaillist.pkl', 'wb') as f:
-                        pickle.dump(email_list, f)
-
-                    os.chdir(tempdir)
-                    zipObj.write('emaillist.pkl')
-                else:
-                    pass
-
-                # close the Zip File
-                os.chdir(wkingdir)
-
-                zipObj.close()
-
-                import ast
-
-                finalzipdict = ast.literal_eval(
-                    zipfileputlistofdicts[zipfilename])
-
-                url = finalzipdict['url']
-                fields = finalzipdict['fields']
-
-                # save files from model deploy to zipfile in tempdir before
-                # loading to s3
-
-                # Load zipfile to s3
-                with open(tempdir + "/" + zipfilename, 'rb') as f:
-                    files = {'file': (tempdir + "/" + zipfilename, f)}
-                    http_response = requests.post(
-                        url, data=fields, files=files)
-                return zipfilename
-
+            from cloud_deployment import upload_comp_exp_zipfile
             compzipfilename = upload_comp_exp_zipfile(
                 data_directory, y_test, eval_metric_filepath, email_list)
 
@@ -1197,111 +1086,8 @@ class ModelPlayground:
             else:
                 pass
 
-            # model competition files
-            def upload_comp_exp_zipfile(
-                    data_directory,
-                    y_test=None,
-                    eval_metric_filepath=None,
-                    email_list=[]):
-                """
-                minimally requires model_filepath, preprocessor_filepath
-                """
-                zipfilelist = [data_directory]
-
-                import json
-                import os
-                import requests
-                import pandas as pd
-                if eval_metric_filepath is None:
-                    pass
-                else:
-                    zipfilelist.append(eval_metric_filepath)
-
-                # need to save dict pkl file with arg name and filepaths to add
-                # to zipfile
-
-                apiurl = "https://djoehnv623.execute-api.us-east-2.amazonaws.com/prod/m"
-
-                apiurl_eval = apiurl[:-1] + "eval"
-
-                headers = {
-                    'Content-Type': 'application/json',
-                    'authorizationToken': json.dumps(
-                        {
-                            "token": os.environ.get("AWS_TOKEN"),
-                            "eval": "TEST"}),
-                }
-                post_dict = {"return_zip": "True"}
-                zipfile = requests.post(
-                    apiurl_eval, headers=headers, data=json.dumps(post_dict))
-
-                zipfileputlistofdicts = json.loads(zipfile.text)['put']
-
-                zipfilename = list(zipfileputlistofdicts.keys())[0]
-
-                from zipfile import ZipFile
-                import os
-                from os.path import basename
-                import tempfile
-
-                wkingdir = os.getcwd()
-
-                tempdir = tempfile.gettempdir()
-
-                zipObj = ZipFile(tempdir + "/" + zipfilename, 'w')
-                # Add multiple files to the zip
-
-                for i in zipfilelist:
-                    for dirname, subdirs, files in os.walk(i):
-                        zipObj.write(dirname)
-                        for filename in files:
-                            zipObj.write(os.path.join(dirname, filename))
-                    # zipObj.write(i)
-
-                # add object to pkl file pathway here. (saving y label data)
-                import pickle
-
-                if y_test is None:
-                    pass
-                else:
-                    with open(tempdir + "/" + 'ytest.pkl', 'wb') as f:
-                        pickle.dump(y_test, f)
-
-                    os.chdir(tempdir)
-                    zipObj.write('ytest.pkl')
-
-                if isinstance(email_list, list):
-                    with open(tempdir + "/" + 'emaillist.pkl', 'wb') as f:
-                        pickle.dump(email_list, f)
-
-                    os.chdir(tempdir)
-                    zipObj.write('emaillist.pkl')
-                else:
-                    pass
-
-                # close the Zip File
-                os.chdir(wkingdir)
-
-                zipObj.close()
-
-                import ast
-
-                finalzipdict = ast.literal_eval(
-                    zipfileputlistofdicts[zipfilename])
-
-                url = finalzipdict['url']
-                fields = finalzipdict['fields']
-
-                # save files from model deploy to zipfile in tempdir before
-                # loading to s3
-
-                # Load zipfile to s3
-                with open(tempdir + "/" + zipfilename, 'rb') as f:
-                    files = {'file': (tempdir + "/" + zipfilename, f)}
-                    http_response = requests.post(
-                        url, data=fields, files=files)
-                return zipfilename
-
+            # competition files
+            from aimodelshare.cloud_deployment import upload_comp_exp_zipfile
             compzipfilename = upload_comp_exp_zipfile(
                 data_directory, y_test, eval_metric_filepath, email_list)
 
@@ -1596,8 +1382,8 @@ class ModelPlayground:
         --------
         response:   "Success" upon successful request
         """
-        from aimodelshare.generatemodelapi import update_access_list as update_list
-        update = update_list(
+        from aimodelshare.generatemodelapi import update_access_list
+        update = update_access_list(
             apiurl=self.playground_url,
             email_list=email_list,
             update_type=update_type)
@@ -1804,8 +1590,8 @@ class ModelPlayground:
         --------
         Formatted competition leaderboard
         """
-        from aimodelshare.leaderboard import stylize_leaderboard as stylize_lead
-        stylized_leaderboard = stylize_lead(
+        from aimodelshare.leaderboard import stylize_leaderboard
+        stylized_leaderboard = stylize_leaderboard(
             leaderboard=leaderboard,
             naming_convention=naming_convention)
         return stylized_leaderboard
@@ -1833,8 +1619,8 @@ class ModelPlayground:
         --------
         data : dictionary of model comparison information
         """
-        from aimodelshare.aimsonnx import compare_models as compare
-        data = compare(apiurl=self.playground_url,
+        from aimodelshare.aimsonnx import compare_models
+        data = compare_models(apiurl=self.playground_url,
                        version_list=version_list,
                        by_model_type=by_model_type,
                        best_model=best_model,

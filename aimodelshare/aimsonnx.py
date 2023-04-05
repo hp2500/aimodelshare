@@ -162,6 +162,7 @@ def _misc_to_onnx(model, initial_types, transfer_learning=None,
     metadata['model_id'] = None
     metadata['data_id'] = None
     metadata['preprocessor_id'] = None
+
     try:
         # infer ml framework from function call
         if isinstance(model, (xgboost.XGBClassifier, xgboost.XGBRegressor)):
@@ -566,7 +567,7 @@ def _keras_to_onnx(model, transfer_learning=None,
         model = model.model
 
     # convert to onnx
-    #onx = convert_keras(model)
+    # onx = convert_keras(model)
     # generate tempfile for onnx object
     temp_dir = tempfile.mkdtemp()
 
@@ -903,12 +904,12 @@ def model_to_onnx(model, framework=None, model_input=None, initial_types=None,
 
     # assert transfer_learning
     if transfer_learning is not None:
-        assert isinstance(transfer_learning, (bool)), \
+        assert isinstance(transfer_learning, bool), \
             'Please pass boolean to indicate whether transfer learning was used.'
 
     # assert deep_learning
     if deep_learning is not None:
-        assert isinstance(deep_learning, (bool)), \
+        assert isinstance(deep_learning, bool), \
             'Please pass boolean to indicate whether deep learning was used.'
 
     # assert task_type
