@@ -673,78 +673,8 @@ class ModelPlayground:
         else:
             cloudlocation = "not set"
         if "model_share" == cloudlocation:
-            print(
-                "Creating your Model Playground Competition...\nEst. completion: ~1 minute\n")
-            if input_dict is None:
-                print("\n--INPUT COMPETITION DETAILS--\n")
 
-                aishare_competitionname = input("Enter competition name:")
-                aishare_competitiondescription = input(
-                    "Enter competition description:")
 
-                print("\n--INPUT DATA DETAILS--\n")
-                print(
-                    "Note: (optional) Save an optional LICENSE.txt file in your competition data directory to make users aware of any restrictions on data sharing/usage.\n")
-
-                aishare_datadescription = input(
-                    "Enter data description (i.e.- filenames denoting training and test data, file types, and any subfolders where files are stored):")
-
-                aishare_datalicense = input(
-                    "Enter optional data license descriptive name (e.g.- 'MIT, Apache 2.0, CC0, Other, etc.'):")
-
-                input_dict = {
-                    "competition_name": aishare_competitionname,
-                    "competition_description": aishare_competitiondescription,
-                    "data_description": aishare_datadescription,
-                    "data_license": aishare_datalicense}
-            else:
-                pass
-
-            # model competition files
-            from aimodelshare.cloud_pathway import upload_comp_exp_zipfile
-            compzipfilename = upload_comp_exp_zipfile(
-                data_directory, y_test, eval_metric_filepath, email_list)
-
-            # if aws arg = false, do this, otherwise do aws code
-            # create deploy code_string
-            def nonecheck(objinput=""):
-                if objinput is None:
-                    objinput = "None"
-                else:
-                    objinput = "'/tmp/" + objinput + "'"
-                return objinput
-
-            playgroundurlcode = "playground_url='" + self.playground_url + "'"
-            compstring = self.class_string.replace(",aws=False", "").replace("playground_url=None",
-                                                                             playgroundurlcode) + "." + "create_competition('/tmp/" + data_directory + "'," + 'y_test' + "," + nonecheck(
-                eval_metric_filepath) + "," + 'email_list' + ",input_dict=" + str(input_dict) + ')'
-
-            import base64
-            import requests
-            import json
-
-            api_url = "https://z4kvag4sxdnv2mvs2b6c4thzj40bxnuw.lambda-url.us-east-2.on.aws/"
-
-            data = json.dumps(
-                {
-                    "code": """from aimodelshare import ModelPlayground;myplayground=""" +
-                    compstring,
-                    "zipfilename": compzipfilename,
-                    "username": os.environ.get("username"),
-                    "password": os.environ.get("password"),
-                    "token": os.environ.get("JWT_AUTHORIZATION_TOKEN"),
-                    "s3keyid": "xrjpv1i7xe"})
-
-            headers = {"Content-Type": "application/json"}
-
-            response = requests.request(
-                "POST", api_url, headers=headers, data=data)
-            result = json.loads(response.text)
-            printoutlist = json.loads(result['body'])
-            printoutlistfinal = printoutlist[2:len(printoutlist)]
-            print("\n")
-            for i in printoutlistfinal:
-                print(i)
 
         else:
 
