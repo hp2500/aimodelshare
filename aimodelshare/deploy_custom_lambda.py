@@ -30,27 +30,27 @@ from aimodelshare.model import _get_predictionmodel_key, _extract_model_metadata
 # create file_objects in temp_dir, abstract from user
 # convert example output from list to json, in frontend display value of key of result
 
+
 def create_bucket(s3_client, bucket_name, region):
-        try:
-            response=s3_client.head_bucket(Bucket=bucket_name)
-        except:
-            if(region=="us-east-1"):
-                response = s3_client.create_bucket(
-                    ACL="private",
-                    Bucket=bucket_name
-                )
-            else:
-                location={'LocationConstraint': region}
-                response=s3_client.create_bucket(
-                    ACL="private",
-                    Bucket=bucket_name,
-                    CreateBucketConfiguration=location
-                )
-        return response
+    try:
+        response = s3_client.head_bucket(Bucket=bucket_name)
+    except:
+        if(region == "us-east-1"):
+            response = s3_client.create_bucket(
+                ACL="private",
+                Bucket=bucket_name
+            )
+        else:
+            location = {'LocationConstraint': region}
+            response = s3_client.create_bucket(
+                ACL="private",
+                Bucket=bucket_name,
+                CreateBucketConfiguration=location
+            )
+    return response
 
 
 def deploy_custom_lambda(input_json_exampledata, output_json_exampledata, lambda_filepath, deployment_dir, private, custom_libraries):
-
     """
         Deploys an AWS Lambda function based on the predict() function specified in the lambda_filepath .py file
         Inputs : 6
@@ -65,12 +65,12 @@ def deploy_custom_lambda(input_json_exampledata, output_json_exampledata, lambda
 
         output_json_exampledata : List of element(s) [REQUIRED]
                                   List of element(s) representing the output that the Lambda will return
-        
+
         lambda_filepath : String [REQUIRED]
                           Expects relative/absolute path to the .py file containing the predict() function,
                           imports to all other custom libraries that are defined by the user and used by the
                           predict() function can be placed in the deployment_dir directory
-        
+
         deployment_dir : String
                          Expects relative/absolute path to the directory containing all the files being used by the
                          predict() function in the lambda_filepath .py file
@@ -121,8 +121,8 @@ def deploy_custom_lambda(input_json_exampledata, output_json_exampledata, lambda
     aws_secret_access_key = str(os.environ.get("AWS_SECRET_ACCESS_KEY_AIMS"))
     region_name = str(os.environ.get("AWS_REGION_AIMS"))
 
-    ### COMMENTS - TO DO
-    api_json= get_api_json()        # why is this required
+    # COMMENTS - TO DO
+    api_json = get_api_json()        # why is this required
     user_client = boto3.client(     # creating apigateway client
         'apigateway',
         aws_access_key_id=aws_access_key_id,
@@ -130,9 +130,9 @@ def deploy_custom_lambda(input_json_exampledata, output_json_exampledata, lambda
         region_name=region_name
     )
     response2 = user_client.import_rest_api(        # what is being imported
-        failOnWarnings = True,
-        parameters = {'endpointConfigurationTypes': 'REGIONAL'},
-        body = api_json
+        failOnWarnings=True,
+        parameters={'endpointConfigurationTypes': 'REGIONAL'},
+        body=api_json
     )
     ###
 
@@ -140,16 +140,20 @@ def deploy_custom_lambda(input_json_exampledata, output_json_exampledata, lambda
 
     api_id = response2['id']
     now = datetime.datetime.now()
-    s3, iam, region = get_s3_iam_client(aws_access_key_id, aws_secret_access_key, region_name)
+    s3, iam, region = get_s3_iam_client(
+        aws_access_key_id, aws_secret_access_key, region_name)
     create_bucket(s3['client'], os.environ.get("BUCKET_NAME"), region)
 
-    apiurl = create_prediction_api(None, str(api_id), 'custom', 'FALSE', [], api_id, "TRUE", custom_libraries)
+    apiurl = create_prediction_api(None, str(api_id), 'custom', 'FALSE', [
+    ], api_id, "TRUE", custom_libraries)
 
     print("\n\nWe need some information about your model before we can generate your API.\n")
     aishare_modelname = input("Name your deployment: ")
     aishare_modeldescription = input("Describe your deployment: ")
-    aishare_modelevaluation = input("Describe your deployment's performance (OPTIONAL): ")
-    aishare_tags = input("Enter comma-separated search categories for your deployment (OPTIONAL): ")
+    aishare_modelevaluation = input(
+        "Describe your deployment's performance (OPTIONAL): ")
+    aishare_tags = input(
+        "Enter comma-separated search categories for your deployment (OPTIONAL): ")
     aishare_apicalls = 0
     print('')
     # unpack user credentials
@@ -158,11 +162,12 @@ def deploy_custom_lambda(input_json_exampledata, output_json_exampledata, lambda
 
     # why is this being done here, can it not be abstracted
 
-    categorical="FALSE" # categorical is being used where, for what
+    categorical = "FALSE"  # categorical is being used where, for what
     bodydata = {
         "id": int(math.log(1/((time.time()*1000000)))*100000000000000),
         "unique_model_id": unique_model_id,
-        "apideveloper": os.environ.get("username"),  # change this to first and last name
+        # change this to first and last name
+        "apideveloper": os.environ.get("username"),
         "apimodeldescription": aishare_modeldescription,
         "apimodelevaluation": aishare_modelevaluation,
         "apimodeltype": 'custom',
@@ -180,7 +185,7 @@ def deploy_custom_lambda(input_json_exampledata, output_json_exampledata, lambda
     # Get the response
     headers_with_authentication = {'Content-Type': 'application/json', 'authorizationToken': os.environ.get("JWT_AUTHORIZATION_TOKEN"), 'Access-Control-Allow-Headers':
                                    'Content-Type,X-Amz-Date,authorizationToken,Access-Control-Allow-Origin,X-Api-Key,X-Amz-Security-Token,Authorization', 'Access-Control-Allow-Origin': '*'}
-    
+
     # modeltoapi lambda function invoked through below url to return new prediction api in response
     requests.post("https://bhrdesksak.execute-api.us-east-1.amazonaws.com/dev/modeldata",
                   json=bodydata, headers=headers_with_authentication)
@@ -190,7 +195,7 @@ def deploy_custom_lambda(input_json_exampledata, output_json_exampledata, lambda
                                    'Content-Type,X-Amz-Date,authorizationToken,Access-Control-Allow-Origin,X-Api-Key,X-Amz-Security-Token,Authorization', 'Access-Control-Allow-Origin': '*'}
     # modeltoapi lambda function invoked through below url to return new prediction api in response
     response = requests.post("https://bhrdesksak.execute-api.us-east-1.amazonaws.com/dev/modeldata",
-                              json=bodydata, headers=headers_with_authentication)
+                             json=bodydata, headers=headers_with_authentication)
     response_string = response.text
     response_string = response_string[1:-1]
 
@@ -198,14 +203,15 @@ def deploy_custom_lambda(input_json_exampledata, output_json_exampledata, lambda
     difference = (end - start).total_seconds()
     finalresult2 = "Your AI Model Share API was created in " + \
         str(int(difference)) + " seconds." + " API Url: " + apiurl['body']
-    s3, iam, region = get_s3_iam_client(os.environ.get("AWS_ACCESS_KEY_ID"), os.environ.get("AWS_SECRET_ACCESS_KEY"), os.environ.get("AWS_REGION"))
+    s3, iam, region = get_s3_iam_client(os.environ.get("AWS_ACCESS_KEY_ID"), os.environ.get(
+        "AWS_SECRET_ACCESS_KEY"), os.environ.get("AWS_REGION"))
     policy_response = iam["client"].get_policy(
         PolicyArn=os.environ.get("POLICY_ARN")
     )
     user_policy = iam["resource"].UserPolicy(
         os.environ.get("IAM_USERNAME"), policy_response['Policy']['PolicyName'])
     response = iam["client"].detach_user_policy(
-        UserName= os.environ.get("IAM_USERNAME"),
+        UserName=os.environ.get("IAM_USERNAME"),
         PolicyArn=os.environ.get("POLICY_ARN")
     )
     # add new policy that only allows file upload to bucket
@@ -228,7 +234,8 @@ def deploy_custom_lambda(input_json_exampledata, output_json_exampledata, lambda
     # Build output {{{
     final_message = ("Follow this link to explore your Model Playground's functionality\n"
                      "You can make predictions with the cURL functionality and access example code from the Programmatic tab.\n")
-    web_dashboard_url = ("https://www.modelshare.org/detail/"+ response_string)
+    web_dashboard_url = (
+        "https://www.modelshare.org/detail/" + response_string)
 
     end = datetime.datetime.now()
     difference = (end - start).total_seconds()
@@ -238,8 +245,9 @@ def deploy_custom_lambda(input_json_exampledata, output_json_exampledata, lambda
     print(api_info)
 
     print("\n\n" + final_message + web_dashboard_url)
-    
+
     return
+
 
 __all__ = [
     deploy_custom_lambda

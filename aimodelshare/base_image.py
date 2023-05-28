@@ -8,26 +8,28 @@ import zipfile
 import importlib.resources as pkg_resources
 from string import Template
 
+
 def lambda_using_base_image(account_id, region, session, project_name, model_dir, requirements_file_path, apiid, memory_size='3000', timeout='90', python_version='3.7'):
 
-    codebuild_bucket_name=os.environ.get("BUCKET_NAME") # s3 bucket name to create  #TODO: use same bucket and subfolder we used previously to store this data
-                                                                                    #Why?  AWS limits users to 100 total buckets!  Our old code only creates one per user per acct.
+    # s3 bucket name to create  #TODO: use same bucket and subfolder we used previously to store this data
+    codebuild_bucket_name = os.environ.get("BUCKET_NAME")
+    # Why?  AWS limits users to 100 total buckets!  Our old code only creates one per user per acct.
 
-    repository=project_name+'-repository' # repository name to create
-    
-    template_folder=tempfile.gettempdir()+'/'+project_name # folder to create for sam
+    repository = project_name+'-repository'  # repository name to create
 
-    stack_name=project_name+'-stack' # stack name to be created in cloudformation
+    template_folder = tempfile.gettempdir()+'/'+project_name  # folder to create for sam
 
-    docker_tag='latest'
-    function_name=project_name
-    role_name=project_name+'-lambda-role'
-    policy_name=project_name+'-lambda-policy'
-    
-    codebuild_role_name=project_name+'-codebuild-role'
-    codebuild_policies_name=project_name+'-codebuild-policies'
+    stack_name = project_name+'-stack'  # stack name to be created in cloudformation
 
-    codebuild_project_name=project_name+'-project'
+    docker_tag = 'latest'
+    function_name = project_name
+    role_name = project_name+'-lambda-role'
+    policy_name = project_name+'-lambda-policy'
+
+    codebuild_role_name = project_name+'-codebuild-role'
+    codebuild_policies_name = project_name+'-codebuild-policies'
+
+    codebuild_project_name = project_name+'-project'
 
     s3_client = session.resource('s3', region_name=region)
 
@@ -49,7 +51,8 @@ def lambda_using_base_image(account_id, region, session, project_name, model_dir
 
     os.mkdir(template_folder)
 
-    response = shutil.copytree(model_dir, '/'.join([template_folder, model_dir]))
+    response = shutil.copytree(
+        model_dir, '/'.join([template_folder, model_dir]))
 
     def get_all_file_paths(directory):
         file_paths = []
@@ -63,7 +66,7 @@ def lambda_using_base_image(account_id, region, session, project_name, model_dir
 
     template_folder_len = len(template_folder)
 
-    with zipfile.ZipFile(''.join([template_folder, '.zip']),'w') as zip:
+    with zipfile.ZipFile(''.join([template_folder, '.zip']), 'w') as zip:
         for file in file_paths:
             zip.write(file, file[template_folder_len:])
 
@@ -73,7 +76,7 @@ def lambda_using_base_image(account_id, region, session, project_name, model_dir
                           ''.join([apiid, '/', project_name, '.zip']))
 
     iam_client = session.client('iam')
-    
+
     response = iam_client.create_policy(
         PolicyName=policy_name,
         PolicyDocument=json.dumps({
@@ -97,7 +100,7 @@ def lambda_using_base_image(account_id, region, session, project_name, model_dir
             ]
         })
     )
-    
+
     time.sleep(5)
 
     response = iam_client.create_role(
@@ -115,16 +118,16 @@ def lambda_using_base_image(account_id, region, session, project_name, model_dir
             ]
         })
     )
-    
+
     time.sleep(5)
-        
+
     response = iam_client.attach_role_policy(
         RoleName=role_name,
         PolicyArn='arn:aws:iam::' + account_id + ':policy/' + policy_name
     )
-    
+
     time.sleep(5)
-    
+
     lambda_client = session.client('lambda')
 
     response = lambda_client.create_function(
@@ -144,11 +147,12 @@ def lambda_using_base_image(account_id, region, session, project_name, model_dir
             }
         }
     )
-    
+
     s3_client.delete_object(Bucket=codebuild_bucket_name, Key=apiid)
-    
+
     shutil.rmtree(template_folder)
-    
+
+
 __all__ = [
     lambda_using_base_image
 ]

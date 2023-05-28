@@ -54,7 +54,8 @@ def get_model_graph(graph, name=None, flow="LR"):
         for input_name in op.input:
             if input_name not in pydot_nodes:
                 input_node = pydot.Node(
-                    _escape_label(input_name + str(pydot_node_counts[input_name])),
+                    _escape_label(
+                        input_name + str(pydot_node_counts[input_name])),
                     label=_escape_label(input_name),
                     **BLOB_STYLE
                 )
@@ -68,7 +69,8 @@ def get_model_graph(graph, name=None, flow="LR"):
             if output_name in pydot_nodes:
                 pydot_node_counts[output_name] += 1
             output_node = pydot.Node(
-                _escape_label(output_name + str(pydot_node_counts[output_name])),
+                _escape_label(
+                    output_name + str(pydot_node_counts[output_name])),
                 label=_escape_label(output_name),
                 **BLOB_STYLE
             )
@@ -78,26 +80,30 @@ def get_model_graph(graph, name=None, flow="LR"):
 
     return pydot_graph
 
-def form_timestamp(ts):
-  st = datetime.datetime.fromtimestamp(ts).strftime('%Y-%m-%d %H:%M:%S')
-  st2 = st.replace(" ","_")
-  st3 = st2.replace(":","_")
-  return st3
 
-#Pandas training data pointer (currently for data updates only)
+def form_timestamp(ts):
+    st = datetime.datetime.fromtimestamp(ts).strftime('%Y-%m-%d %H:%M:%S')
+    st2 = st.replace(" ", "_")
+    st3 = st2.replace(":", "_")
+    return st3
+
+# Pandas training data pointer (currently for data updates only)
+
+
 def extract_varnames_fromtrainingdata(trainingdata="default"):
-  import pandas as pd
-  import numpy as np
-  if isinstance(trainingdata, pd.DataFrame):
-    variabletypes=list(trainingdata.dtypes.values.astype(str)) # always use pandas dtypes
-    variablecolumns=list(trainingdata.columns)
-  else:
-    variabletypes=None
-    variablecolumns=None
-  return [variabletypes,variablecolumns]
+    import pandas as pd
+    import numpy as np
+    if isinstance(trainingdata, pd.DataFrame):
+        # always use pandas dtypes
+        variabletypes = list(trainingdata.dtypes.values.astype(str))
+        variablecolumns = list(trainingdata.columns)
+    else:
+        variabletypes = None
+        variablecolumns = None
+    return [variabletypes, variablecolumns]
+
 
 def _get_extension_from_filepath(Filepath):
-  Filename = os.path.basename(Filepath)
-  file_name, file_extension = os.path.splitext(Filename)
-  return file_extension
-
+    Filename = os.path.basename(Filepath)
+    file_name, file_extension = os.path.splitext(Filename)
+    return file_extension

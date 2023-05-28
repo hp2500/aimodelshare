@@ -14,6 +14,7 @@ def get_path():
 def update_context(app, pagename, templatename, context, doctree):
     context['karma_sphinx_theme_version'] = version.__version__
 
+
 def setup(app):
     """ add_html_theme is new in Sphinx 1.6+ """
 

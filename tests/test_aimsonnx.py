@@ -20,6 +20,7 @@ from torch import nn
 import torch
 from tensorflow.keras.layers import Dense
 
+
 def test_sklearn_to_onnx():
 
     from sklearn.datasets import load_iris
@@ -61,7 +62,8 @@ def test_keras_to_onnx():
     model.add(Dense(12, input_shape=(8,), activation='relu'))
     model.add(Dense(8, activation='relu'))
     model.add(Dense(1, activation='sigmoid'))
-    model.compile(loss='binary_crossentropy', optimizer='adam', metrics=['accuracy'])
+    model.compile(loss='binary_crossentropy',
+                  optimizer='adam', metrics=['accuracy'])
 
     onnx_model = _keras_to_onnx(model)
     assert isinstance(onnx_model, onnx.ModelProto)
@@ -87,16 +89,17 @@ def test_get_layer_names():
 
 def test_get_layer_names_pytorch():
 
-        layers = _get_layer_names_pytorch()
+    layers = _get_layer_names_pytorch()
 
-        assert isinstance(layers, tuple)
+    assert isinstance(layers, tuple)
 
 
 def test_get_sklearn_modules():
 
-        modules = _get_sklearn_modules()
+    modules = _get_sklearn_modules()
 
-        assert isinstance(modules, dict)
+    assert isinstance(modules, dict)
+
 
 def test_model_from_string():
 
@@ -132,4 +135,3 @@ def test_layer_mapping():
 
     layer_map = layer_mapping(direction="keras_to_torch", activation=True)
     assert isinstance(layer_map, dict)
-

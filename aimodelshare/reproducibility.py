@@ -11,122 +11,131 @@ import tensorflow as tf
 
 from aimodelshare.aws import get_s3_iam_client, run_function_on_lambda, get_aws_client
 
+
 def export_reproducibility_env(seed, directory, mode="gpu"):
-  # Change the output into json.dumps
-  # Argument single seed for all inputs & mode
-  data = {
-    "global_seed_code": [
-      "os.environ['PYTHONHASHSEED'] = '{}'".format(seed),
-      "random.seed({})".format(seed),
-      "tf.random.set_seed({})".format(seed),
-      "np.random.seed({})".format(seed),
+    # Change the output into json.dumps
+    # Argument single seed for all inputs & mode
+    data = {
+        "global_seed_code": [
+            "os.environ['PYTHONHASHSEED'] = '{}'".format(seed),
+            "random.seed({})".format(seed),
+            "tf.random.set_seed({})".format(seed),
+            "np.random.seed({})".format(seed),
+        ]
+    }
+
+    # Ignore this part for now
+    # Local seed codes are tensorflow code that are
+    # not affected by the global seed and sometimes require us
+    # to define the seed in the function call
+    data["local_seed_code"] = [
+        "train_ds = tf.keras.preprocessing.image_dataset_from_directory(data_dir, validation_split=0.2, subset='training', seed={}, image_size=(img_height, img_width), batch_size=batch_size)".format(
+            seed),
+        "val_ds = tf.keras.preprocessing.image_dataset_from_directory(data_dir, validation_split=0.2, subset='validation', seed={}, image_size=(img_height, img_width), batch_size=batch_size)".format(
+            seed),
     ]
-  }
 
-  # Ignore this part for now
-  # Local seed codes are tensorflow code that are
-  # not affected by the global seed and sometimes require us
-  # to define the seed in the function call
-  data["local_seed_code"] = [
-    "train_ds = tf.keras.preprocessing.image_dataset_from_directory(data_dir, validation_split=0.2, subset='training', seed={}, image_size=(img_height, img_width), batch_size=batch_size)".format(seed),
-    "val_ds = tf.keras.preprocessing.image_dataset_from_directory(data_dir, validation_split=0.2, subset='validation', seed={}, image_size=(img_height, img_width), batch_size=batch_size)".format(seed),
-  ]
+    if mode == "gpu":
+        data["gpu_cpu_parallelism_ops"] = [
+            "os.environ['TF_DETERMINISTIC_OPS'] = '1'",
+            "os.environ['TF_CUDNN_DETERMINISTIC'] = '1'"
+        ]
+    elif mode == "cpu":
+        data["gpu_cpu_parallelism_ops"] = [
+            "tf.config.threading.set_inter_op_parallelism_threads(1)"
+        ]
+    else:
+        raise Exception("Error: unknown 'mode' value, expected 'gpu' or 'cpu'")
 
-  if mode == "gpu":
-    data["gpu_cpu_parallelism_ops"] = [
-      "os.environ['TF_DETERMINISTIC_OPS'] = '1'",
-      "os.environ['TF_CUDNN_DETERMINISTIC'] = '1'"
-    ]
-  elif mode == "cpu":
-    data["gpu_cpu_parallelism_ops"] = [
-      "tf.config.threading.set_inter_op_parallelism_threads(1)"
-    ]
-  else:
-    raise Exception("Error: unknown 'mode' value, expected 'gpu' or 'cpu'")
+    installed_packages = pkg_resources.working_set
+    installed_packages_list = sorted(["%s==%s" % (i.key, i.version)
+                                      for i in installed_packages])
 
-  installed_packages = pkg_resources.working_set
-  installed_packages_list = sorted(["%s==%s" % (i.key, i.version)
-    for i in installed_packages])
+    data["session_runtime_info"] = {
+        "installed_packages": installed_packages_list,
+        "python_version": sys.version,
+    }
 
-  data["session_runtime_info"] = {
-    "installed_packages": installed_packages_list,
-    "python_version": sys.version,
-  }
+    with open(os.path.join(directory, "reproducibility.json"), "w") as fp:
+        json.dump(data, fp)
 
-  with open(os.path.join(directory, "reproducibility.json"), "w") as fp:
-    json.dump(data, fp)
+    return print("Your reproducibility environment is now saved to 'reproducibility.json'")
 
-  return print("Your reproducibility environment is now saved to 'reproducibility.json'")
 
 def set_reproducibility_env(reproducibility_env):
-  # Change the input into dict / json
-  for global_code in reproducibility_env["global_seed_code"]:
-    exec("%s" % (global_code))
+    # Change the input into dict / json
+    for global_code in reproducibility_env["global_seed_code"]:
+        exec("%s" % (global_code))
 
-  for parallelism_ops in reproducibility_env["gpu_cpu_parallelism_ops"]:
-    exec("%s" % (parallelism_ops))
+    for parallelism_ops in reproducibility_env["gpu_cpu_parallelism_ops"]:
+        exec("%s" % (parallelism_ops))
+
 
 def import_reproducibility_env(reproducibility_env_file):
-  with open(reproducibility_env_file) as json_file:
-    reproducibility_env = json.load(json_file)
-    set_reproducibility_env(reproducibility_env)
+    with open(reproducibility_env_file) as json_file:
+        reproducibility_env = json.load(json_file)
+        set_reproducibility_env(reproducibility_env)
 
-  print("Your reproducibility environment is successfully setup")
+    print("Your reproducibility environment is successfully setup")
 
-def import_reproducibility_env_from_competition_model(apiurl,version,submission_type): 
-  # Confirm that creds are loaded, print warning if not
-  if all(["username" in os.environ, 
-        "password" in os.environ]):
-    pass
-  else:
-    return print("Credentials not found. Please provide credentials with set_credentials().")
 
-  post_dict = {
-      "y_pred": [],
-      "return_eval": "False",
-      "return_y": "False",
-      "inspect_model": "False",
-      "version": "None", 
-      "compare_models": "False",
-      "version_list": "None",
-      "get_leaderboard": "False",
-      "instantiate_model": "False",
-      "reproduce": "True",
-      "trained": "False",
-      "model_version": version,
-      "submission_type": submission_type
-  }
+def import_reproducibility_env_from_competition_model(apiurl, version, submission_type):
+    # Confirm that creds are loaded, print warning if not
+    if all(["username" in os.environ,
+            "password" in os.environ]):
+        pass
+    else:
+        return print("Credentials not found. Please provide credentials with set_credentials().")
 
-  headers = { 'Content-Type':'application/json', 'authorizationToken': os.environ.get("AWS_TOKEN"),} 
+    post_dict = {
+        "y_pred": [],
+        "return_eval": "False",
+        "return_y": "False",
+        "inspect_model": "False",
+        "version": "None",
+        "compare_models": "False",
+        "version_list": "None",
+        "get_leaderboard": "False",
+        "instantiate_model": "False",
+        "reproduce": "True",
+        "trained": "False",
+        "model_version": version,
+        "submission_type": submission_type
+    }
 
-  apiurl_eval=apiurl[:-1]+"eval"
+    headers = {'Content-Type': 'application/json',
+               'authorizationToken': os.environ.get("AWS_TOKEN"), }
 
-  resp = requests.post(apiurl_eval,headers=headers,data=json.dumps(post_dict)) 
+    apiurl_eval = apiurl[:-1]+"eval"
 
-  # Check for appropriate response from Lambda. 
-  try :
-      resp.raise_for_status()
-  except requests.exceptions.HTTPError :
-      raise Exception(f"Error: Received {resp.status_code} from AWS, Please check if Model Version is correct.")
+    resp = requests.post(apiurl_eval, headers=headers,
+                         data=json.dumps(post_dict))
 
-  # Load Dictionary
-  resp_dict = json.loads(resp.text)
+    # Check for appropriate response from Lambda.
+    try:
+        resp.raise_for_status()
+    except requests.exceptions.HTTPError:
+        raise Exception(
+            f"Error: Received {resp.status_code} from AWS, Please check if Model Version is correct.")
 
-  # Check if key,value pair exists
-  if resp_dict['reproducibility_env'] != None:
-      set_reproducibility_env(resp_dict['reproducibility_env'])
-      # Store version of reproducibility_environment_set 
-      os.environ['reproducibility_environment_version'] = str(version)
-      print("Your reproducibility environment is successfully setup. Please setup data and then call `replicate_model` ")
-  else:
-      print("Reproducibility environment is not found")
+    # Load Dictionary
+    resp_dict = json.loads(resp.text)
+
+    # Check if key,value pair exists
+    if resp_dict['reproducibility_env'] != None:
+        set_reproducibility_env(resp_dict['reproducibility_env'])
+        # Store version of reproducibility_environment_set
+        os.environ['reproducibility_environment_version'] = str(version)
+        print("Your reproducibility environment is successfully setup. Please setup data and then call `replicate_model` ")
+    else:
+        print("Reproducibility environment is not found")
 
 
 def import_reproducibility_env_from_model(apiurl):
-    if all(["AWS_ACCESS_KEY_ID_AIMS" in os.environ, 
+    if all(["AWS_ACCESS_KEY_ID_AIMS" in os.environ,
             "AWS_SECRET_ACCESS_KEY_AIMS" in os.environ,
-            "AWS_REGION_AIMS" in os.environ, 
-            "username" in os.environ, 
+            "AWS_REGION_AIMS" in os.environ,
+            "username" in os.environ,
             "password" in os.environ]):
         pass
     else:
@@ -155,7 +164,7 @@ def import_reproducibility_env_from_model(apiurl):
         print("This model was not deployed with reproducibility support")
         raise err
 
-    # generate tempfile for onnx object 
+    # generate tempfile for onnx object
     temp_dir = tempfile.gettempdir()
     temp_path = os.path.join(temp_dir, 'temp_file_name')
 

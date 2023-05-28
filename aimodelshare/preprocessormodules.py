@@ -10,12 +10,14 @@ from pathlib import Path
 #from aimodelshare.python.my_preprocessor import *
 
 # how to import a preprocessor from a zipfile into a tempfile then into the current session
+
+
 def import_preprocessor(filepath):
     """
     Import preprocessor function to session from zip file 
     Inputs: 1 
     Output: preprocessor function
-    
+
     Parameters:
     -----------
     `filepath`: ``string``
@@ -24,21 +26,21 @@ def import_preprocessor(filepath):
         "./preprocessor.zip" 
         file is generated using export_preprocessor function from the AI Modelshare library 
         preprocessor function should always be named 'preprocessor' to work properly in aimodelshare process
-    
+
     Returns:
     --------
     imports preprocessor function to session
     """
 
-    #preprocessor fxn should always be named "preprocessor" to work properly in aimodelshare process.
+    # preprocessor fxn should always be named "preprocessor" to work properly in aimodelshare process.
     import tempfile
     from zipfile import ZipFile
     import inspect
     import os
     import pickle
     import string
-    
-    #create temporary folder
+
+    # create temporary folder
     temp_dir = tempfile.mkdtemp()
 
     # Create a ZipFile Object and load sample.zip in it
@@ -56,12 +58,12 @@ def import_preprocessor(filepath):
             pickle_file_list.append(os.path.join(temp_dir, file))
         if file.endswith(".zip"):
             zip_file_list.append(os.path.join(temp_dir, file))
-    
-    for i in pickle_file_list: 
-        objectname=str(os.path.basename(i)).replace(".pkl", "")
-        objects={objectname:""}
-        globals()[objectname]=pickle.load(open(str(i), "rb" ) )
-    
+
+    for i in pickle_file_list:
+        objectname = str(os.path.basename(i)).replace(".pkl", "")
+        objects = {objectname: ""}
+        globals()[objectname] = pickle.load(open(str(i), "rb"))
+
     # Need spark session and context to instantiate model object
     # zip_file_list is only used by pyspark
     if len(zip_file_list):
@@ -69,17 +71,17 @@ def import_preprocessor(filepath):
             from pyspark.sql import SparkSession
         except:
             raise("Error: Please install pyspark to enable pyspark features")
-            
+
         spark = SparkSession \
             .builder \
             .appName('Pyspark Model') \
             .getOrCreate()
-    
+
     for i in zip_file_list:
         objectnames = str(os.path.basename(i)).replace(".zip", "").split("__")
         dir_path = i.replace(".zip", "")
         Path(dir_path).mkdir(parents=True, exist_ok=True)
-          
+
         # Create a ZipFile Object and load module.zip in it
         with ZipFile(i, 'r') as zipObj:
             # Extract all the contents of zip file in current directory
@@ -98,17 +100,17 @@ def import_preprocessor(filepath):
         globals()[objectname] = preprocessor_model
 
     # First import preprocessor function to session from preprocessor.py
-    exec(open(os.path.join(temp_dir, 'preprocessor.py')).read(),globals())
+    exec(open(os.path.join(temp_dir, 'preprocessor.py')).read(), globals())
     try:
         # clean up temp directory files for future runs
         os.remove(os.path.join(temp_dir, "preprocessor.py"))
     except:
         pass
-   
+
     try:
-        for file in pickle_file_list: 
+        for file in pickle_file_list:
             os.remove(file)
-        
+
         for file in zip_file_list:
             os.remove(file)
     except:
@@ -116,24 +118,25 @@ def import_preprocessor(filepath):
 
     return preprocessor
 
-def export_preprocessor(preprocessor_fxn,directory, globs=globals()):
+
+def export_preprocessor(preprocessor_fxn, directory, globs=globals()):
     """
     Exports preprocessor and related objects into zip file for model deployment
     Inputs: 2 
     Output: zipfile named 'preprocessor.zip'
-    
+
     Parameters:
     -----------
     `preprocessor_fxn`: name of preprocessor function
         Preprocessor function should always be named "preprocessor" to work properly in aimodelshare process.
     `directory`: ``string`` folderpath to preprocessor function
         use "" to reference current working directory
-    
+
     Returns:
     --------
     file named 'preprocessor.zip' in the correct format for model deployment
     """
-    #preprocessor fxn should always be named "preprocessor" to work properly in aimodelshare process.
+    # preprocessor fxn should always be named "preprocessor" to work properly in aimodelshare process.
     try:
         import tempfile
         from zipfile import ZipFile
@@ -142,16 +145,16 @@ def export_preprocessor(preprocessor_fxn,directory, globs=globals()):
 
         globals().update(preprocessor_fxn.__globals__)
 
-        folderpath=directory
+        folderpath = directory
 
-        #create temporary folder
-        temp_dir=tempfile.mkdtemp()
+        # create temporary folder
+        temp_dir = tempfile.mkdtemp()
         try:
             os.remove(os.path.join(folderpath, "preprocessor.zip"))
         except:
             pass
 
-        #save function code within temporary folder
+        # save function code within temporary folder
         source = inspect.getsource(preprocessor_fxn)
         with open(os.path.join(temp_dir, "preprocessor.py"), "w") as f:
             f.write(source)
@@ -159,23 +162,26 @@ def export_preprocessor(preprocessor_fxn,directory, globs=globals()):
         # create a ZipFile object
         zipObj = ZipFile(os.path.join(folderpath, "preprocessor.zip"), 'w')
         # Add preprocessor function to the zipfile
-        zipObj.write(os.path.join(temp_dir,"preprocessor.py"),"preprocessor.py")
+        zipObj.write(os.path.join(temp_dir, "preprocessor.py"),
+                     "preprocessor.py")
 
-        #getting list of global variables used in function
+        # getting list of global variables used in function
 
         import inspect
-        function_objects=list(inspect.getclosurevars(preprocessor_fxn).globals.keys())
-        
+        function_objects = list(inspect.getclosurevars(
+            preprocessor_fxn).globals.keys())
+
         import sys
         import imp
-        modulenames = ["sklearn","keras","tensorflow","cv2","resize","pytorch","librosa","pyspark"]
+        modulenames = ["sklearn", "keras", "tensorflow",
+                       "cv2", "resize", "pytorch", "librosa", "pyspark"]
 
         # List all standard libraries not covered by sys.builtin_module_names
         paths = (os.path.abspath(p) for p in sys.path)
         stdlib = {
             p for p in paths
-            if p.startswith((sys.prefix)) 
-                and 'site-packages' not in p
+            if p.startswith((sys.prefix))
+            and 'site-packages' not in p
         }
 
         # Exclude standard libraries
@@ -192,15 +198,18 @@ def export_preprocessor(preprocessor_fxn,directory, globs=globals()):
                 # print(e)
                 continue
 
-        function_objects_nomodules = [i for i in function_objects if i not in list(modulenames)]
+        function_objects_nomodules = [
+            i for i in function_objects if i not in list(modulenames)]
 
         def savetopickle(function_objects_listelement):
             import pickle
-            pickle.dump(globals()[function_objects_listelement], open( os.path.join(temp_dir,function_objects_listelement+".pkl"), "wb" ) )
+            pickle.dump(globals()[function_objects_listelement], open(
+                os.path.join(temp_dir, function_objects_listelement+".pkl"), "wb"))
             return function_objects_listelement
 
         def save_to_zip(function_objects_listelement):
-            model_name_path = str(globals()[function_objects_listelement]) + "__" + function_objects_listelement
+            model_name_path = str(
+                globals()[function_objects_listelement]) + "__" + function_objects_listelement
             temp_path = os.path.join(temp_dir, model_name_path)
             try:
                 shutil.rmtree(temp_path)
@@ -210,14 +219,15 @@ def export_preprocessor(preprocessor_fxn,directory, globs=globals()):
             if not os.path.exists(temp_path):
                 os.mkdir(temp_path)
 
-            globals()[function_objects_listelement].write().overwrite().save(temp_path)
+            globals()[function_objects_listelement].write(
+            ).overwrite().save(temp_path)
 
             # calling function to get all file paths in the directory
             from aimodelshare.aimsonnx import get_pyspark_model_files_paths
             file_paths = get_pyspark_model_files_paths(temp_path)
 
             temp_zip_path = os.path.join(temp_dir, model_name_path + ".zip")
-            with ZipFile(temp_zip_path,'w') as zip:
+            with ZipFile(temp_zip_path, 'w') as zip:
                 # writing each file one by one
                 for file in file_paths:
                     zip.write(os.path.join(temp_path, file), file)
@@ -234,26 +244,28 @@ def export_preprocessor(preprocessor_fxn,directory, globs=globals()):
         savedpreprocessorobjectslist = []
         for function_objects_nomodule in function_objects_nomodules:
             try:
-                savedpreprocessorobjectslist.append(savetopickle(function_objects_nomodule))
+                savedpreprocessorobjectslist.append(
+                    savetopickle(function_objects_nomodule))
                 export_methods.append("pickle")
             except Exception as e:
                 # print(e)
                 try:
-                    os.remove(os.path.join(temp_dir, function_objects_nomodule+".pkl"))
+                    os.remove(os.path.join(
+                        temp_dir, function_objects_nomodule+".pkl"))
                 except:
                     pass
                 # print("Try .zip export approach")
                 try:
-                    savedpreprocessorobjectslist.append(save_to_zip(function_objects_nomodule))
+                    savedpreprocessorobjectslist.append(
+                        save_to_zip(function_objects_nomodule))
                     export_methods.append("zip")
                 except Exception as e:
                     # print(e)
                     pass
-        
+
         # take savedpreprocessorobjectslist pkl & zip files saved to tempdir to zipfile
         import pickle
         import string
-
 
         for i, value in enumerate(savedpreprocessorobjectslist):
             if export_methods[i] == "pickle":
@@ -267,7 +279,7 @@ def export_preprocessor(preprocessor_fxn,directory, globs=globals()):
 
         try:
             # clean up temp directory files for future runs
-            os.remove(os.path.join(temp_dir,"preprocessor.py"))
+            os.remove(os.path.join(temp_dir, "preprocessor.py"))
 
             for i, value in enumerate(savedpreprocessorobjectslist):
                 if export_methods[i] == "pickle":
@@ -283,37 +295,34 @@ def export_preprocessor(preprocessor_fxn,directory, globs=globals()):
 
     return print("Your preprocessor is now saved to 'preprocessor.zip'")
 
+
 def upload_preprocessor(preprocessor_path, client, bucket, model_id, model_version):
 
-  try:
+    try:
 
-    
-    # Check the preprocessor {{{
-    if not os.path.exists(preprocessor_path):
-        raise FileNotFoundError(
-            f"The preprocessor file at {preprocessor_path} does not exist"
-        )
+        # Check the preprocessor {{{
+        if not os.path.exists(preprocessor_path):
+            raise FileNotFoundError(
+                f"The preprocessor file at {preprocessor_path} does not exist"
+            )
 
-    
-    file_name = os.path.basename(preprocessor_path)
-    file_name, file_ext = os.path.splitext(file_name)
-    
-    from zipfile import ZipFile
-    dir_zip = preprocessor_path
+        file_name = os.path.basename(preprocessor_path)
+        file_name, file_ext = os.path.splitext(file_name)
 
-    #zipObj = ZipFile(os.path.join("./preprocessor.zip"), 'a')
-    #/Users/aishwarya/Downloads/aimodelshare-master
-    client["client"].upload_file(dir_zip, bucket, model_id + "/runtime_preprocessor" + ".zip")
-  except Exception as e:
-    print(e)
+        from zipfile import ZipFile
+        dir_zip = preprocessor_path
 
+        #zipObj = ZipFile(os.path.join("./preprocessor.zip"), 'a')
+        # /Users/aishwarya/Downloads/aimodelshare-master
+        client["client"].upload_file(
+            dir_zip, bucket, model_id + "/runtime_preprocessor" + ".zip")
+    except Exception as e:
+        print(e)
 
-     
 
 __all__ = [
     import_preprocessor,
     export_preprocessor,
     upload_preprocessor,
-    
-]
 
+]

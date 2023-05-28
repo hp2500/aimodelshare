@@ -2,7 +2,8 @@ import time
 import json
 import boto3
 
-delay=2
+delay = 2
+
 
 class AWSClient():
 
@@ -19,7 +20,8 @@ class AWSClient():
 
     def get_repository_details(self, repository_name):
         try:
-            response = self.ecr_client.describe_repositories(repositoryNames=[repository_name])
+            response = self.ecr_client.describe_repositories(
+                repositoryNames=[repository_name])
             repository_details = response['repositories']
         except:
             repository_details = []
@@ -27,7 +29,8 @@ class AWSClient():
 
     def get_image_details(self, repository_name, image_tag):
         try:
-            response = self.ecr_client.describe_images(repositoryName=repository_name, imageIds=[{'imageTag': image_tag}])
+            response = self.ecr_client.describe_images(
+                repositoryName=repository_name, imageIds=[{'imageTag': image_tag}])
             image_details = response['imageDetails']
         except:
             image_details = []
@@ -50,10 +53,12 @@ class AWSClient():
         return policy_details
 
     def detach_policies_from_role(self, role_name):
-        response = self.iam_client.list_attached_role_policies(RoleName=role_name)
+        response = self.iam_client.list_attached_role_policies(
+            RoleName=role_name)
         policies = response['AttachedPolicies']
         for policy in policies:
-            response = self.iam_client.detach_role_policy(RoleName=role_name, PolicyArn=policy['PolicyArn'])
+            response = self.iam_client.detach_role_policy(
+                RoleName=role_name, PolicyArn=policy['PolicyArn'])
             time.sleep(delay)
 
     def delete_iam_role(self, role_name):
@@ -61,7 +66,7 @@ class AWSClient():
             response = self.detach_policies_from_role(role_name)
             response = self.iam_client.delete_role(RoleName=role_name)
             time.sleep(delay)
-        
+
     def delete_iam_policy(self, policy_name):
         policy_arn = "arn:aws:iam::" + self.account_id + ":policy/" + policy_name
         if(len(self.get_policy_details(policy_arn))):
@@ -69,21 +74,25 @@ class AWSClient():
             time.sleep(delay)
 
     def create_iam_role(self, role_name, trust_relationship):
-        response = self.iam_client.create_role(RoleName=role_name, AssumeRolePolicyDocument=json.dumps(trust_relationship))
+        response = self.iam_client.create_role(
+            RoleName=role_name, AssumeRolePolicyDocument=json.dumps(trust_relationship))
         time.sleep(delay)
 
     def create_iam_policy(self, policy_name, policy):
         policy_arn = "arn:aws:iam::" + self.account_id + ":policy/" + policy_name
-        response = self.iam_client.create_policy(PolicyName=policy_name, PolicyDocument=json.dumps(policy))
+        response = self.iam_client.create_policy(
+            PolicyName=policy_name, PolicyDocument=json.dumps(policy))
         time.sleep(delay)
 
     def attach_policy_to_role(self, role_name, policy_name):
         policy_arn = "arn:aws:iam::" + self.account_id + ":policy/" + policy_name
-        response = self.iam_client.attach_role_policy(RoleName = role_name, PolicyArn = policy_arn)
+        response = self.iam_client.attach_role_policy(
+            RoleName=role_name, PolicyArn=policy_arn)
         time.sleep(delay)
 
     def create_repository(self, repository_name):
-        response = self.ecr_client.create_repository(repositoryName=repository_name)
+        response = self.ecr_client.create_repository(
+            repositoryName=repository_name)
         time.sleep(delay)
 
     def delete_repository(self, repository_name):
@@ -91,18 +100,20 @@ class AWSClient():
         time.sleep(delay)
 
     def upload_file_to_s3(self, local_file_path, bucket_name, bucket_file_path):
-        response = self.s3_client.upload_file(local_file_path, bucket_name, bucket_file_path)
+        response = self.s3_client.upload_file(
+            local_file_path, bucket_name, bucket_file_path)
         time.sleep(delay)
 
     def delete_file_from_s3(self, bucket_name, bucket_file_path):
-        response = self.s3_client.delete_object(Bucket=bucket_name, Key=bucket_file_path)
+        response = self.s3_client.delete_object(
+            Bucket=bucket_name, Key=bucket_file_path)
         time.sleep(delay)
 
     def create_s3_bucket(self, bucket_name, region):
         try:
-            response=self.s3_client.head_bucket(Bucket=bucket_name)
+            response = self.s3_client.head_bucket(Bucket=bucket_name)
         except:
-            if(region=="us-east-1"):
+            if(region == "us-east-1"):
                 response = self.s3_client.create_bucket(
                     ACL="private",
                     Bucket=bucket_name
